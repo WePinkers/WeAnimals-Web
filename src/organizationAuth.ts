@@ -1,5 +1,6 @@
 import {
   browserLocalPersistence,
+  browserSessionPersistence,
   setPersistence,
   signInAnonymously,
   signInWithEmailAndPassword,
@@ -20,8 +21,11 @@ import { auth, db } from './firebase'
 const ORGANIZATION_IDENTIFIER_COLLECTION = 'organization_identifiers'
 const ORGANIZATION_VERIFICATION_COLLECTION =
   'organization_verification_requests'
-const TEMPORARY_CNPJ = '90702678000109'
+const ORGANIZATION_ACCOUNTS_COLLECTION = 'organization_accounts'
+const TEMPORARY_CNPJ = '62075431000174'
 const TEMPORARY_EMAIL = 'alissanovais@gmail.com'
+
+let organizationLoginMutationInProgress = false
 
 export class OrganizationAuthError extends Error {
   readonly code: string
@@ -31,6 +35,10 @@ export class OrganizationAuthError extends Error {
     this.code = code
     this.name = 'OrganizationAuthError'
   }
+}
+
+export function isOrganizationLoginMutationInProgress() {
+  return organizationLoginMutationInProgress
 }
 
 function normalizeCnpj(value: string) {
@@ -91,35 +99,56 @@ async function resolveOrganizationEmail(identifier: string) {
 export async function signInOrganization(
   identifier: string,
   password: string,
+  rememberConnected: boolean,
 ): Promise<User> {
-  await setPersistence(auth, browserLocalPersistence)
+  organizationLoginMutationInProgress = true
 
-  const { email, isTemporaryAccess } =
-    await resolveOrganizationEmail(identifier)
-  const credential = await signInWithEmailAndPassword(auth, email, password)
-  const user = credential.user
-
-  await user.reload()
-  if (!user.emailVerified) {
-    await signOut(auth)
-    throw new OrganizationAuthError('email-not-verified')
-  }
-
-  if (!isTemporaryAccess) {
-    const pendingSnapshot = await getDocs(
-      query(
-        collection(db, ORGANIZATION_VERIFICATION_COLLECTION),
-        where('requesterId', '==', user.uid),
-        where('status', '==', 'pending'),
-        limit(1),
-      ),
+  try {
+    await setPersistence(
+      auth,
+      rememberConnected ? browserLocalPersistence : browserSessionPersistence,
     )
 
-    if (!pendingSnapshot.empty) {
-      await signOut(auth)
-      throw new OrganizationAuthError('pending')
-    }
-  }
+    const { email, isTemporaryAccess } =
+      await resolveOrganizationEmail(identifier)
+    const credential = await signInWithEmailAndPassword(auth, email, password)
+    const user = credential.user
 
-  return user
+    await user.reload()
+    if (!user.emailVerified) {
+      await signOut(auth)
+      throw new OrganizationAuthError('email-not-verified')
+    }
+
+    const tokenResult = await user.getIdTokenResult()
+    const isAdmin = tokenResult.claims.admin === true
+
+    if (!isTemporaryAccess && !isAdmin) {
+      const pendingSnapshot = await getDocs(
+        query(
+          collection(db, ORGANIZATION_VERIFICATION_COLLECTION),
+          where('requesterId', '==', user.uid),
+          where('status', '==', 'pending'),
+          limit(1),
+        ),
+      )
+      const accountSnapshot = await getDoc(
+        doc(db, ORGANIZATION_ACCOUNTS_COLLECTION, user.uid),
+      )
+      const accountStatus = accountSnapshot.get('status')
+
+      if (
+        !pendingSnapshot.empty ||
+        !accountSnapshot.exists() ||
+        accountStatus !== 'approved'
+      ) {
+        await signOut(auth)
+        throw new OrganizationAuthError('pending')
+      }
+    }
+
+    return user
+  } finally {
+    organizationLoginMutationInProgress = false
+  }
 }
