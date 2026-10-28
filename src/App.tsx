@@ -7,6 +7,7 @@ import {
   type User,
 } from 'firebase/auth'
 import './App.css'
+import AdminApp from './admin/AdminApp'
 import { auth } from './firebase'
 import {
   isOrganizationLoginMutationInProgress,
@@ -18,6 +19,7 @@ import {
   OrganizationAccreditationError,
   submitOrganizationAccreditation,
 } from './organizationAccreditation'
+import { hasAdminAccess } from './admin/adminAccess'
 
 type LoginErrorCode =
   | 'invalid-identifier'
@@ -107,20 +109,112 @@ const checkIns = [
 ]
 
 function App() {
+  if (window.location.pathname.startsWith('/admin')) {
+    return <AdminRoute />
+  }
+
+  return <OrganizationPortalApp />
+}
+
+function AdminRoute() {
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [allowed, setAllowed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+
+    return onAuthStateChanged(auth, (nextUser) => {
+      if (!nextUser || nextUser.isAnonymous) {
+        if (active) {
+          setAllowed(false)
+          setCheckingAccess(false)
+        }
+        return
+      }
+
+      void hasAdminAccess(nextUser).then((hasAccess) => {
+        if (!active) return
+
+        setAllowed(hasAccess)
+        setCheckingAccess(false)
+      })
+    })
+  }, [])
+
+  if (checkingAccess) {
+    return (
+      <main className="session-loading" aria-live="polite">
+        <span className="loading-spinner" />
+        <p>Validando acesso administrativo...</p>
+      </main>
+    )
+  }
+
+  if (!allowed) {
+    return (
+      <main className="admin-access-denied">
+        <div className="admin-access-card">
+          <span className="admin-access-lock" aria-hidden="true">⌑</span>
+          <span className="eyebrow">ACESSO RESTRITO</span>
+          <h1>Painel administrativo</h1>
+          <p>
+            Entre com um e-mail de administrador autorizado para acessar esta área.
+          </p>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => window.location.assign('/')}
+          >
+            Voltar para o login
+          </button>
+        </div>
+      </main>
+    )
+  }
+
+  return <AdminApp />
+}
+
+function OrganizationPortalApp() {
   const [user, setUser] = useState<User | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (nextUser) => {
+    let active = true
+
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       if (
         isOrganizationAuthMutationInProgress() ||
         isOrganizationLoginMutationInProgress()
       ) {
         return
       }
-      setUser(nextUser?.isAnonymous ? null : nextUser)
-      setCheckingSession(false)
+
+      if (!nextUser || nextUser.isAnonymous) {
+        if (active) {
+          setUser(null)
+          setCheckingSession(false)
+        }
+        return
+      }
+
+      void hasAdminAccess(nextUser).then((isAdmin) => {
+        if (!active) return
+
+        if (isAdmin) {
+          window.location.replace('/admin')
+          return
+        }
+
+        setUser(nextUser)
+        setCheckingSession(false)
+      })
     })
+
+    return () => {
+      active = false
+      unsubscribe()
+    }
   }, [])
 
   if (checkingSession) {
@@ -234,6 +328,12 @@ function OrganizationLogin({
         password,
         rememberConnected,
       )
+
+      if (await hasAdminAccess(authenticatedUser)) {
+        window.location.assign('/admin')
+        return
+      }
+
       onAuthenticated(authenticatedUser)
     } catch (error) {
       if (error instanceof OrganizationAuthError) {

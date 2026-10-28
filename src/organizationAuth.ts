@@ -17,6 +17,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
+import { isConfiguredAdminEmail } from './admin/adminAccess'
 
 const ORGANIZATION_IDENTIFIER_COLLECTION = 'organization_identifiers'
 const ORGANIZATION_VERIFICATION_COLLECTION =
@@ -115,13 +116,17 @@ export async function signInOrganization(
     const user = credential.user
 
     await user.reload()
-    if (!user.emailVerified) {
+    const tokenResult = await user.getIdTokenResult()
+    const isAdmin =
+      isConfiguredAdminEmail(user.email) ||
+      tokenResult.claims.admin === true
+
+    // As contas administrativas de teste não dependem de uma caixa de e-mail
+    // real. Organizações continuam precisando confirmar o endereço.
+    if (!isAdmin && !user.emailVerified) {
       await signOut(auth)
       throw new OrganizationAuthError('email-not-verified')
     }
-
-    const tokenResult = await user.getIdTokenResult()
-    const isAdmin = tokenResult.claims.admin === true
 
     if (!isTemporaryAccess && !isAdmin) {
       const pendingSnapshot = await getDocs(

@@ -432,6 +432,53 @@ button {
   animation: spin 800ms linear infinite;
 }
 
+.admin-access-denied {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--s0);
+}
+
+.admin-access-card {
+  width: min(100%, 440px);
+  padding: 36px;
+  border: 1px solid var(--ln);
+  border-radius: 16px;
+  background: #fffdf8;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(19, 42, 32, 0.12);
+}
+
+.admin-access-lock {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 20px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--p9);
+  background: var(--b1);
+  font-size: 26px;
+}
+
+.admin-access-card h1 {
+  margin: 10px 0 12px;
+  color: var(--p9);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 30px;
+}
+
+.admin-access-card p {
+  margin: 0 0 24px;
+  color: var(--i6);
+  line-height: 1.6;
+}
+
+.admin-access-card .primary-button {
+  width: 100%;
+}
+
 .text-button,
 .logout-link {
   display: block;
