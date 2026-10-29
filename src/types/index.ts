@@ -141,4 +141,5 @@ export type OrganizationProfile = {
   pixKey: string
   responsibleName: string
   verifiedAt: string
+  isVerified?: boolean 
 }

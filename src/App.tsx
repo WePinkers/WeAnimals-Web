@@ -6,7 +6,15 @@ import {
   signOut,
   type User,
 } from 'firebase/auth'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  arrayUnion 
+} from 'firebase/firestore'
 import './App.css'
 import { auth, db } from './firebase'
 import {
@@ -806,7 +814,7 @@ function OrganizationDashboard({
           pixKey: user.email || 'doacoes@abrigoesperanca.org',
           responsibleName: 'Renata Ferreira',
           verifiedAt: '12/03/2025',
-          isVerified: true, // Mantém true por padrão para o abrigo principal não bloquear
+          isVerified: true,
         }
   })
 
@@ -822,7 +830,6 @@ function OrganizationDashboard({
     },
   ])
 
-  // AQUI É ONDE O FIREBASE ENTRA PARA SUBSTITUIR OS DADOS FICTÍCIOS
   useEffect(() => {
     const unsubscribeReports = onSnapshot(collection(db, 'reports'), (snapshot) => {
       if (!snapshot.empty) {
@@ -844,9 +851,42 @@ function OrganizationDashboard({
       }
     })
 
+    const unsubscribeCandidates = onSnapshot(collection(db, 'candidates'), (snapshot) => {
+      if (!snapshot.empty) {
+        const realCandidates = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Candidate[]
+        setCandidates(realCandidates)
+      }
+    })
+
+    const unsubscribePosts = onSnapshot(collection(db, 'posts'), (snapshot) => {
+      if (!snapshot.empty) {
+        const realPosts = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as CommunityPost[]
+        setPosts(realPosts)
+      }
+    })
+
+    const unsubscribeCheckIns = onSnapshot(collection(db, 'checkins'), (snapshot) => {
+      if (!snapshot.empty) {
+        const realCheckIns = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as CheckInRecord[]
+        setCheckIns(realCheckIns)
+      }
+    })
+
     return () => {
       unsubscribeReports()
       unsubscribeAnimals()
+      unsubscribeCandidates()
+      unsubscribePosts()
+      unsubscribeCheckIns()
     }
   }, [])
 
@@ -887,187 +927,183 @@ function OrganizationDashboard({
     setNotifications((prev) => [newNotif, ...prev])
   }
 
-  const selectedReport =
-    reports.find((r) => r.id === selectedReportId) ?? reports[0]
+  // --- FUNÇÕES DE ESCRITA NO FIRESTORE ---
 
-  function handleUpdateReportStatus(reportId: number, status: ReportStatus) {
-    setReports((current) =>
-      current.map((report) =>
-        report.id === reportId
-          ? { ...report, status, elapsed: 'atualizado agora' }
-          : report,
-      ),
-    )
-    pushNotification('Denúncia Atualizada', `O status da denúncia #${reportId} mudou para "${status}".`, 'reports', 'urgent')
-  }
-
-  function handleSendReportMessage(reportId: number, text: string) {
-    setReports((current) =>
-      current.map((report) =>
-        report.id === reportId
-          ? {
-              ...report,
-              chat: [
-                ...report.chat,
-                {
-                  id: `msg-${Date.now()}`,
-                  text,
-                  mine: true,
-                  timestamp: 'agora',
-                },
-              ],
-            }
-          : report,
-      ),
-    )
-  }
-
-  function handleAddAnimal(newAnimal: Omit<AnimalItem, 'id'>) {
-    const id = `ani-${Date.now()}`
-    setAnimals((prev) => [{ id, ...newAnimal }, ...prev])
-    setSelectedAnimalId(id)
-    pushNotification('Novo Animal', `${newAnimal.name} foi cadastrado para adoção.`, 'animals', 'adoption')
-  }
-
-  function handleUpdateCandidateStatus(
-    candidateId: string,
-    status: CandidateStatus,
-  ) {
-    setCandidates((prev) =>
-      prev.map((c) => {
-        if (c.id === candidateId) {
-          if (status === 'aprovado') {
-            const animalObj = animals.find((a) => a.id === c.animalId)
-            const newCheckIn: CheckInRecord = {
-              id: `chk-${Date.now()}`,
-              animal: animalObj ? animalObj.name : 'Pet',
-              adopter: c.name,
-              currentDays: 30,
-              status: 'Ótima',
-              reviewed: false,
-              reportsByPeriod: {
-                30: [{ label: 'Adaptação inicial (30d)', value: 'Adoção recém-aprovada' }],
-                90: [{ label: 'Status (90d)', value: 'Aguardando prazo' }],
-                180: [{ label: 'Status (180d)', value: 'Aguardando prazo' }],
-              },
-            }
-            setCheckIns((chkPrev) => [newCheckIn, ...chkPrev])
-            pushNotification('Adoção Aprovada!', `Check-in de 30 dias gerado para ${c.name}.`, 'checkins', 'checkin')
-          }
-          return { ...c, status }
-        }
-        return c
-      }),
-    )
-  }
-
-  function handleSaveCommunityPost(postData: any) {
-    if (postData.id) {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postData.id
-            ? {
-                ...p,
-                title: postData.title,
-                type: postData.type,
-                categoryLabel: postData.categoryLabel,
-                description: postData.description,
-                progressText: postData.progressText,
-              }
-            : p,
-        ),
-      )
-    } else {
-      const newPost: CommunityPost = {
-        id: `post-${Date.now()}`,
-        author: profile.name,
-        isOwn: true,
-        type: postData.type,
-        categoryLabel: postData.categoryLabel,
-        title: postData.title,
-        description: postData.description,
-        progressText: postData.progressText,
-        progressPct: 10,
-        subscribers: [],
-        likes: 0,
-        commentsList: [],
-        elapsed: 'agora',
-      }
-      setPosts((prev) => [newPost, ...prev])
-      pushNotification('Nova Campanha', `"${postData.title}" foi publicada na comunidade.`, 'community', 'info')
+  async function handleUpdateReportStatus(reportId: number, status: ReportStatus) {
+    try {
+      const reportRef = doc(db, 'reports', String(reportId))
+      await updateDoc(reportRef, { status, elapsed: 'atualizado agora' })
+      pushNotification('Denúncia Atualizada', `O status da denúncia #${reportId} mudou para "${status}".`, 'reports', 'urgent')
+    } catch (error) {
+      console.error('Erro ao atualizar status da denúncia:', error)
     }
   }
 
-  function handleDeleteCommunityPost(id: string) {
-    setPosts((prev) => prev.filter((p) => p.id !== id))
+  async function handleSendReportMessage(reportId: number, text: string) {
+    try {
+      const reportRef = doc(db, 'reports', String(reportId))
+      const novaMensagem = {
+        id: `msg-${Date.now()}`,
+        text,
+        mine: true,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+      await updateDoc(reportRef, {
+        chat: arrayUnion(novaMensagem)
+      })
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error)
+    }
   }
 
-  function handleLikeCommunityPost(id: string) {
-    setPosts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, likes: (p.likes ?? 0) + 1 } : p)),
-    )
+  async function handleAddAnimal(newAnimal: Omit<AnimalItem, 'id'>) {
+    try {
+      await addDoc(collection(db, 'animals'), newAnimal)
+      pushNotification('Novo Animal', `${newAnimal.name} foi cadastrado para adoção.`, 'animals', 'adoption')
+    } catch (error) {
+      console.error('Erro ao adicionar animal:', error)
+    }
   }
 
-  function handleAddPostComment(postId: string, text: string) {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              commentsList: [
-                ...(p.commentsList ?? []),
-                {
-                  id: `c-${Date.now()}`,
-                  author: profile.name,
-                  text,
-                  timeAgo: 'agora',
-                },
-              ],
+  async function handleUpdateCandidateStatus(candidateId: string, status: CandidateStatus, justificationText?: string) {
+    try {
+      const candidateRef = doc(db, 'candidates', candidateId)
+      const updateData: any = { status }
+      if (justificationText) updateData.justification = justificationText
+
+      await updateDoc(candidateRef, updateData)
+
+      if (status === 'aprovado') {
+        const c = candidates.find((cand) => cand.id === candidateId)
+        if (c) {
+          const animalObj = animals.find((a) => a.id === c.animalId)
+          await addDoc(collection(db, 'checkins'), {
+            animal: animalObj ? animalObj.name : 'Pet',
+            adopter: c.name,
+            currentDays: 30,
+            status: 'Ótima',
+            reviewed: false,
+            reportsByPeriod: {
+              30: [{ label: 'Adaptação inicial (30d)', value: 'Adoção recém-aprovada' }],
+              90: [{ label: 'Status (90d)', value: 'Aguardando prazo' }],
+              180: [{ label: 'Status (180d)', value: 'Aguardando prazo' }],
             }
-          : p,
-      ),
-    )
+          })
+          pushNotification('Adoção Aprovada!', `Check-in de 30 dias gerado para ${c.name}.`, 'checkins', 'checkin')
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar candidato:', error)
+    }
   }
 
-  function handleAddCampaignSubscriber(
-    postId: string,
-    subscriber: { name: string; contact: string; detail: string },
-  ) {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              subscribers: [
-                ...(p.subscribers ?? []),
-                {
-                  id: `sub-${Date.now()}`,
-                  name: subscriber.name,
-                  contact: subscriber.contact,
-                  detail: subscriber.detail,
-                  status: 'Confirmado',
-                },
-              ],
-            }
-          : p,
-      ),
-    )
+  async function handleSaveCommunityPost(postData: any) {
+    try {
+      if (postData.id) {
+        const postRef = doc(db, 'posts', postData.id)
+        await updateDoc(postRef, {
+          title: postData.title,
+          type: postData.type,
+          categoryLabel: postData.categoryLabel,
+          description: postData.description,
+          progressText: postData.progressText,
+        })
+      } else {
+        const newPost = {
+          author: profile.name,
+          isOwn: true,
+          type: postData.type,
+          categoryLabel: postData.categoryLabel,
+          title: postData.title,
+          description: postData.description,
+          progressText: postData.progressText,
+          progressPct: 10,
+          subscribers: [],
+          likes: 0,
+          commentsList: [],
+          elapsed: 'agora',
+        }
+        await addDoc(collection(db, 'posts'), newPost)
+        pushNotification('Nova Campanha', `"${postData.title}" foi publicada na comunidade.`, 'community', 'info')
+      }
+    } catch (error) {
+      console.error('Erro ao salvar post:', error)
+    }
   }
 
-  function handleMarkCheckInReviewed(id: string) {
-    setCheckIns((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, reviewed: true } : c)),
-    )
+  async function handleDeleteCommunityPost(id: string) {
+    try {
+      await deleteDoc(doc(db, 'posts', id))
+    } catch (error) {
+      console.error('Erro ao excluir post:', error)
+    }
   }
 
-  function handleMarkNotificationsAsRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  async function handleLikeCommunityPost(id: string) {
+    try {
+      const postRef = doc(db, 'posts', id)
+      const post = posts.find((p) => p.id === id)
+      if (post) {
+        await updateDoc(postRef, { likes: (post.likes ?? 0) + 1 })
+      }
+    } catch (error) {
+      console.error('Erro ao curtir post:', error)
+    }
   }
+
+  async function handleAddPostComment(postId: string, text: string) {
+    try {
+      const postRef = doc(db, 'posts', postId)
+      await updateDoc(postRef, {
+        commentsList: arrayUnion({
+          id: `c-${Date.now()}`,
+          author: profile.name,
+          text,
+          timeAgo: 'agora',
+        })
+      })
+    } catch (error) {
+      console.error('Erro ao adicionar comentário:', error)
+    }
+  }
+
+  async function handleAddCampaignSubscriber(postId: string, subscriber: { name: string; contact: string; detail: string }) {
+    try {
+      const postRef = doc(db, 'posts', postId)
+      await updateDoc(postRef, {
+        subscribers: arrayUnion({
+          id: `sub-${Date.now()}`,
+          name: subscriber.name,
+          contact: subscriber.contact,
+          detail: subscriber.detail,
+          status: 'Confirmado',
+        })
+      })
+    } catch (error) {
+      console.error('Erro ao adicionar inscrito:', error)
+    }
+  }
+
+  async function handleMarkCheckInReviewed(id: string) {
+    try {
+      const checkinRef = doc(db, 'checkins', id)
+      await updateDoc(checkinRef, { reviewed: true })
+    } catch (error) {
+      console.error('Erro ao atualizar check-in:', error)
+    }
+  }
+
+  const selectedReport =
+    reports.find((r) => r.id === selectedReportId) ?? reports[0]
 
   const badges = {
     reports: reports.filter((r) => r.status !== 'Encaminhado a abrigo').length,
     animals: candidates.filter((c) => c.status === 'pendente').length,
     checkins: checkIns.filter((c) => !c.reviewed).length,
+  }
+
+  function handleMarkNotificationsAsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
   }
 
   return (
