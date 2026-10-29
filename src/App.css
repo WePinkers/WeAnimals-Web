@@ -1825,3 +1825,123 @@ tr.k:hover td {
     transform: translateY(0);
   }
 }
+
+/* Botão da barrinha (oculto em desktop) */
+.mobile-menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  color: var(--i7, #1e293b);
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mobile-overlay {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .portal-shell {
+    grid-template-columns: 240px 1fr;
+  }
+  
+  .portal-grid.checkins-grid,
+  .portal-grid.profile-grid,
+  .portal-grid.home-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .portal-shell {
+    display: block;
+    position: relative;
+  }
+
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  /* Transforma a sidebar numa gaveta lateral oculta por padrão */
+  .portal-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px;
+    height: 100vh;
+    z-index: 10000;
+    background: #0f172a; /* Cor padrão do fundo da sidebar */
+    transition: left 0.3s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  /* Quando aberto pelo botão da barrinha */
+  .portal-sidebar.mobile-open {
+    left: 0;
+  }
+
+  /* Fundo escuro translúcido ao abrir o menu */
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+  }
+
+  .portal-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .portal-sidebar .org {
+    display: flex;
+    margin-top: auto;
+  }
+
+  .portal-main {
+    padding: 16px;
+    width: 100%;
+  }
+
+  .portal-grid.g3 {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .table-card {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 500px;
+  }
+}
+
+.portal-sidebar .org span {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.portal-nav .nav.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.portal-nav .nav.locked:hover {
+  background: transparent;
+  color: #94a3b8;
+}

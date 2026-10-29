@@ -4,7 +4,6 @@ import type {
   CheckInRecord,
   Report,
 } from '../types'
-import { useToast } from '../components/ToastContext'
 
 interface HomeProps {
   reports: Report[]
@@ -25,8 +24,6 @@ export function Home({
   onOpenCandidates,
   onOpenCheckIns,
 }: HomeProps) {
-  const { showToast } = useToast()
-
   const activeReports = reports.filter((r) => r.status !== 'Encaminhado a abrigo')
   const pendingCandidates = candidates.filter((c) => c.status === 'pendente')
   const pendingCheckIns = checkIns.filter((c) => !c.reviewed)
@@ -46,7 +43,6 @@ export function Home({
           label="candidaturas pendentes"
           onClick={() => {
             onOpenCandidates(topAnimal?.id)
-            showToast('Abrindo candidaturas...', '🐾')
           }}
         />
         <StatCard
@@ -54,7 +50,6 @@ export function Home({
           label="denúncias ativas"
           onClick={() => {
             if (activeReports[0]) onOpenReport(activeReports[0].id)
-            showToast('Abrindo denúncias...', '🚨')
           }}
         />
         <StatCard
@@ -62,7 +57,6 @@ export function Home({
           label="check-ins para revisar"
           onClick={() => {
             onOpenCheckIns(pendingCheckIns[0]?.id)
-            showToast('Abrindo check-ins...', '◷')
           }}
         />
       </div>

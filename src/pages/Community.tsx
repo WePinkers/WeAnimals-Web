@@ -32,22 +32,28 @@ export function Community({
   const { showToast } = useToast()
   const [filter, setFilter] = useState<'all' | 'Campanha' | 'Post'>('all')
 
-  // Estado do modal de Criar / Editar
+  // Estado do modal de Criar / Editar com Tipos Dinâmicos
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | undefined>(undefined)
-  const [title, setTitle] = useState('')
+  
   const [postType, setPostType] = useState<'Campanha' | 'Post'>('Campanha')
-  const [categoryLabel, setCategoryLabel] = useState('Castração')
+  const [campaignCategory, setCampaignCategory] = useState<'Castração' | 'Doação' | 'Lar Temporário'>('Castração')
+  
+  const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [progressText, setProgressText] = useState('')
+  
+  // Campos específicos dinâmicos baseados na categoria
+  const [eventDate, setEventDate] = useState('')
+  const [locationArea, setLocationArea] = useState('')
+  const [totalSlots, setTotalSlots] = useState('')
+  const [goalValue, setGoalValue] = useState('')
 
-  // Estado do modal de Inscritos da Campanha
+  // Modais auxiliares
   const [subscribersModalPostId, setSubscribersModalPostId] = useState<string | null>(null)
   const [subName, setSubName] = useState('')
   const [subContact, setSubContact] = useState('')
   const [subDetail, setSubDetail] = useState('')
 
-  // Estado do modal de Comentários do Post
   const [commentsModalPostId, setCommentsModalPostId] = useState<string | null>(null)
   const [newCommentText, setNewCommentText] = useState('')
 
@@ -60,11 +66,14 @@ export function Community({
 
   function openNewModal() {
     setEditingId(undefined)
-    setTitle('')
     setPostType('Campanha')
-    setCategoryLabel('Castração')
+    setCampaignCategory('Castração')
+    setTitle('')
     setDescription('')
-    setProgressText('0 de 50 vagas')
+    setEventDate('')
+    setLocationArea('')
+    setTotalSlots('60')
+    setGoalValue('5000')
     setIsModalOpen(true)
   }
 
@@ -72,9 +81,10 @@ export function Community({
     setEditingId(post.id)
     setTitle(post.title)
     setPostType(post.type)
-    setCategoryLabel(post.categoryLabel)
     setDescription(post.description)
-    setProgressText(post.progressText ?? '')
+    if (post.categoryLabel === 'Doação' || post.categoryLabel === 'Lar Temporário' || post.categoryLabel === 'Castração') {
+      setCampaignCategory(post.categoryLabel)
+    }
     setIsModalOpen(true)
   }
 
@@ -83,22 +93,29 @@ export function Community({
       showToast('Preencha o título e a descrição!', '⚠️')
       return
     }
+
+    let computedProgress = 'Em andamento'
+    if (postType === 'Campanha') {
+      if (campaignCategory === 'Castração') {
+        computedProgress = `0 de ${totalSlots || '60'} vagas`
+      } else if (campaignCategory === 'Doação') {
+        computedProgress = `R$ 0 de R$ ${goalValue || '5.000'}`
+      } else {
+        computedProgress = `Aberto para acolhimento`
+      }
+    }
+
     onSavePost({
       id: editingId,
       title: title.trim(),
       type: postType,
-      categoryLabel: categoryLabel.trim() || postType,
-      description: description.trim(),
-      progressText:
-        postType === 'Campanha'
-          ? progressText.trim() || 'Recém iniciada'
-          : undefined,
+      categoryLabel: postType === 'Campanha' ? campaignCategory : 'Post',
+      description: postType === 'Campanha' ? `${eventDate ? eventDate + ' · ' : ''}${locationArea ? locationArea + ' · ' : ''}${description}` : description,
+      progressText: postType === 'Campanha' ? computedProgress : undefined,
     })
+
     setIsModalOpen(false)
-    showToast(
-      editingId ? 'Publicação atualizada com sucesso!' : 'Nova publicação criada!',
-      '📢',
-    )
+    showToast(editingId ? 'Publicação atualizada com sucesso!' : 'Nova campanha publicada!', '📢')
   }
 
   function handleSendComment() {
@@ -121,7 +138,7 @@ export function Community({
     setSubName('')
     setSubContact('')
     setSubDetail('')
-    showToast('Inscrito adicionado à campanha!', '✓')
+    showToast('Inscrito adicionado à lista!', '✓')
   }
 
   return (
@@ -167,7 +184,7 @@ export function Community({
                 <i style={{ width: `${post.progressPct ?? 45}%` }} />
               </div>
               <span className="progress-label">
-                {post.progressText} · {subscribersCount} inscritos na lista
+                {post.progressText} · {subscribersCount} inscritos
               </span>
               <div className="campaign-actions">
                 <button
@@ -255,7 +272,7 @@ export function Community({
         })}
       </div>
 
-      {/* MODAL 1: LISTA DE INSCRITOS DA CAMPANHA */}
+      {/* MODAL 1: LISTA DE INSCRITOS */}
       {activeSubscribersPost && (
         <div
           className="legal-modal-backdrop"
@@ -263,18 +280,11 @@ export function Community({
         >
           <div
             className="portal-card"
-            style={{
-              width: 'min(100%, 560px)',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              padding: 24,
-            }}
+            style={{ width: 'min(100%, 560px)', maxHeight: '85vh', overflowY: 'auto', padding: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="head" style={{ marginBottom: 6 }}>
-              <h2 style={{ margin: 0 }}>
-                Inscritos · {activeSubscribersPost.title}
-              </h2>
+              <h2 style={{ margin: 0 }}>Inscritos · {activeSubscribersPost.title}</h2>
               <span className="pill ok">{activeSubscribersPost.progressText}</span>
             </div>
             <small style={{ color: 'var(--i6)', display: 'block', marginBottom: 16 }}>
@@ -286,17 +296,11 @@ export function Community({
                 <div className="box">Nenhum inscrito registrado até o momento.</div>
               ) : (
                 (activeSubscribersPost.subscribers ?? []).map((sub) => (
-                  <div
-                    key={sub.id}
-                    className="row"
-                    style={{ marginBottom: 0, cursor: 'default' }}
-                  >
+                  <div key={sub.id} className="row" style={{ marginBottom: 0, cursor: 'default' }}>
                     <div className="ic">{sub.name.charAt(0).toUpperCase()}</div>
                     <div style={{ flex: 1 }}>
                       <div className="t">{sub.name}</div>
-                      <div className="s">
-                        {sub.contact} · {sub.detail}
-                      </div>
+                      <div className="s">{sub.contact} · {sub.detail}</div>
                     </div>
                     <span className="pill ok">{sub.status}</span>
                   </div>
@@ -304,16 +308,8 @@ export function Community({
               )}
             </div>
 
-            <div
-              style={{
-                borderTop: '1px solid var(--ln)',
-                paddingTop: 14,
-                marginTop: 8,
-              }}
-            >
-              <div className="mono" style={{ marginBottom: 6 }}>
-                Adicionar inscrito manualmente
-              </div>
+            <div style={{ borderTop: '1px solid var(--ln)', paddingTop: 14, marginTop: 8 }}>
+              <div className="mono" style={{ marginBottom: 6 }}>Adicionar inscrito manualmente</div>
               <div className="portal-grid g3" style={{ gap: 8 }}>
                 <input
                   type="text"
@@ -329,30 +325,16 @@ export function Community({
                 />
                 <input
                   type="text"
-                  placeholder="Animal / Doação"
+                  placeholder="Detalhe / Animal"
                   value={subDetail}
                   onChange={(e) => setSubDetail(e.target.value)}
                 />
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginTop: 12,
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn ap"
-                  onClick={handleCreateSubscriber}
-                >
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
+                <button type="button" className="btn ap" onClick={handleCreateSubscriber}>
                   + Confirmar inscrição
                 </button>
-                <button
-                  type="button"
-                  className="btn g"
-                  onClick={() => setSubscribersModalPostId(null)}
-                >
+                <button type="button" className="btn g" onClick={() => setSubscribersModalPostId(null)}>
                   Fechar
                 </button>
               </div>
@@ -361,7 +343,7 @@ export function Community({
         </div>
       )}
 
-      {/* MODAL 2: VISUALIZAR POST E COMENTÁRIOS */}
+      {/* MODAL 2: COMENTÁRIOS DO POST */}
       {activeCommentsPost && (
         <div
           className="legal-modal-backdrop"
@@ -369,20 +351,11 @@ export function Community({
         >
           <div
             className="portal-card"
-            style={{
-              width: 'min(100%, 540px)',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              padding: 24,
-            }}
+            style={{ width: 'min(100%, 540px)', maxHeight: '85vh', overflowY: 'auto', padding: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="mono-label">
-              Post · {activeCommentsPost.elapsed ?? 'agora'}
-            </span>
-            <h2 style={{ marginTop: 4, marginBottom: 8 }}>
-              {activeCommentsPost.author}
-            </h2>
+            <span className="mono-label">Post · {activeCommentsPost.elapsed ?? 'agora'}</span>
+            <h2 style={{ marginTop: 4, marginBottom: 8 }}>{activeCommentsPost.author}</h2>
             <p style={{ fontSize: 14, color: 'var(--i9)', marginBottom: 16 }}>
               {activeCommentsPost.description}
             </p>
@@ -391,47 +364,17 @@ export function Community({
               Comentários ({(activeCommentsPost.commentsList ?? []).length})
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gap: 8,
-                maxHeight: 260,
-                overflowY: 'auto',
-                marginBottom: 14,
-              }}
-            >
+            <div style={{ display: 'grid', gap: 8, maxHeight: 260, overflowY: 'auto', marginBottom: 14 }}>
               {(activeCommentsPost.commentsList ?? []).length === 0 ? (
-                <div className="box">
-                  Nenhum comentário ainda. Seja o primeiro a comentar!
-                </div>
+                <div className="box">Nenhum comentário ainda. Seja o primeiro a comentar!</div>
               ) : (
                 (activeCommentsPost.commentsList ?? []).map((comment) => (
-                  <div
-                    key={comment.id}
-                    style={{
-                      padding: '10px 12px',
-                      background: 'var(--s0)',
-                      border: '1px solid var(--ln)',
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginBottom: 4,
-                      }}
-                    >
-                      <strong style={{ fontSize: 12.5, color: 'var(--p9)' }}>
-                        {comment.author}
-                      </strong>
-                      <span style={{ fontSize: 11, color: 'var(--i6)' }}>
-                        {comment.timeAgo}
-                      </span>
+                  <div key={comment.id} style={{ padding: '10px 12px', background: 'var(--s0)', border: '1px solid var(--ln)', borderRadius: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <strong style={{ fontSize: 12.5, color: 'var(--p9)' }}>{comment.author}</strong>
+                      <span style={{ fontSize: 11, color: 'var(--i6)' }}>{comment.timeAgo}</span>
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--i9)' }}>
-                      {comment.text}
-                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--i9)' }}>{comment.text}</div>
                   </div>
                 ))
               )}
@@ -448,40 +391,27 @@ export function Community({
                   if (e.key === 'Enter') handleSendComment()
                 }}
               />
-              <button type="button" className="btn" onClick={handleSendComment}>
-                Comentar
-              </button>
+              <button type="button" className="btn" onClick={handleSendComment}>Comentar</button>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-              <button
-                type="button"
-                className="btn g"
-                onClick={() => setCommentsModalPostId(null)}
-              >
-                Fechar
-              </button>
+              <button type="button" className="btn g" onClick={() => setCommentsModalPostId(null)}>Fechar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: CRIAR / EDITAR PUBLICAÇÃO */}
+      {/* MODAL 3: CRIAR / EDITAR COM FORMULÁRIO DINÂMICO POR CATEGORIA */}
       {isModalOpen && (
-        <div
-          className="legal-modal-backdrop"
-          onClick={() => setIsModalOpen(false)}
-        >
+        <div className="legal-modal-backdrop" onClick={() => setIsModalOpen(false)}>
           <div
             className="portal-card"
-            style={{ width: 'min(100%, 480px)', padding: 24 }}
+            style={{ width: 'min(100%, 500px)', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2>{editingId ? 'Editar publicação' : 'Nova publicação / campanha'}</h2>
 
-            <div className="mono" style={{ marginTop: 10 }}>
-              Tipo
-            </div>
+            <div className="mono" style={{ marginTop: 10 }}>Tipo de Publicação</div>
             <div className="chips">
               {(['Campanha', 'Post'] as const).map((t) => (
                 <button
@@ -495,59 +425,100 @@ export function Community({
               ))}
             </div>
 
-            <div className="mono">Título</div>
+            {postType === 'Campanha' && (
+              <>
+                <div className="mono" style={{ marginTop: 10 }}>Categoria da Campanha</div>
+                <div className="chips">
+                  {(['Castração', 'Doação', 'Lar Temporário'] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      className={`chip ${campaignCategory === cat ? 'sel' : ''}`}
+                      onClick={() => setCampaignCategory(cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="mono" style={{ marginTop: 10 }}>Título Principal</div>
             <input
               type="text"
-              placeholder="Ex: Mutirão de Castração"
+              placeholder={postType === 'Campanha' ? 'Ex: Mutirão de Castração Vila Marlene' : 'Ex: Aviso importante do abrigo'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
 
-            {postType === 'Campanha' && (
-              <>
-                <div className="mono" style={{ marginTop: 8 }}>
-                  Categoria (ex: Castração, Doação)
+            {/* CAMPOS DINÂMICOS CONFORME A CATEGORIA ESCOLHIDA */}
+            {postType === 'Campanha' && campaignCategory === 'Castração' && (
+              <div className="portal-grid g2" style={{ gap: 10, marginTop: 4 }}>
+                <div>
+                  <div className="mono">Data e Horário</div>
+                  <input
+                    type="text"
+                    placeholder="Sáb, 6 set · 8h–13h"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={categoryLabel}
-                  onChange={(e) => setCategoryLabel(e.target.value)}
-                />
-
-                <div className="mono" style={{ marginTop: 8 }}>
-                  Meta / Progresso
+                <div>
+                  <div className="mono">Total de Vagas</div>
+                  <input
+                    type="text"
+                    placeholder="Ex: 60 vagas"
+                    value={totalSlots}
+                    onChange={(e) => setTotalSlots(e.target.value)}
+                  />
                 </div>
-                <input
-                  type="text"
-                  placeholder="Ex: 28 de 60 vagas"
-                  value={progressText}
-                  onChange={(e) => setProgressText(e.target.value)}
-                />
-              </>
+              </div>
             )}
 
-            <div className="mono" style={{ marginTop: 8 }}>
-              Descrição / Detalhes
-            </div>
+            {postType === 'Campanha' && campaignCategory === 'Doação' && (
+              <div className="portal-grid g2" style={{ gap: 10, marginTop: 4 }}>
+                <div>
+                  <div className="mono">Meta Financeira ou Itens</div>
+                  <input
+                    type="text"
+                    placeholder="Ex: R$ 5.000 ou 100 cobertores"
+                    value={goalValue}
+                    onChange={(e) => setGoalValue(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <div className="mono">Prazo Limite</div>
+                  <input
+                    type="text"
+                    placeholder="Ex: Até 30 de setembro"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {postType === 'Campanha' && (
+              <div style={{ marginTop: 4 }}>
+                <div className="mono">Bairro / Região de Atuação</div>
+                <input
+                  type="text"
+                  placeholder="Ex: Vila Marlene, Centro, Zona Sul..."
+                  value={locationArea}
+                  onChange={(e) => setLocationArea(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="mono" style={{ marginTop: 10 }}>Descrição / Detalhes</div>
             <textarea
-              placeholder="Detalhes do evento, datas ou informações..."
+              placeholder="Explique os detalhes do evento, regras ou o objetivo da campanha..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 10,
-                marginTop: 14,
-              }}
-            >
-              <button
-                type="button"
-                className="btn g"
-                onClick={() => setIsModalOpen(false)}
-              >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+              <button type="button" className="btn g" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </button>
               <button type="button" className="btn" onClick={handleSave}>
