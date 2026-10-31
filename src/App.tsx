@@ -10,7 +10,7 @@ import {
   collection, 
   onSnapshot, 
   doc, 
-  addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc, 
   arrayUnion 
@@ -75,52 +75,6 @@ const initialReports: Report[] = [
       { id: 'm2', text: 'Equipe a caminho, chegada em 22 min.', mine: true, timestamp: '14:12' },
     ],
   },
-  {
-    id: 4455,
-    priority: 'Urgente',
-    priorityClass: 'urgent',
-    title: 'Gato ferido',
-    location: 'Centro',
-    address: 'Av. XV de Novembro, 210 — Centro',
-    coordinates: { lat: -23.5505, lng: -46.6333 },
-    status: 'Resgate',
-    reporter: 'João P.',
-    reporterSince: 'jan 2026',
-    reporterTotalReports: 3,
-    reporterReliability: 89,
-    elapsed: 'há 3 h',
-    triage: {
-      immediateRisk: 'Sim',
-      activeAbuse: 'Não',
-      trappedOrInjured: 'Sim',
-      streetNoRisk: 'Não',
-      photoName: 'foto-gato-centro.jpg',
-    },
-    chat: [],
-  },
-  {
-    id: 4440,
-    priority: 'Urgente',
-    priorityClass: 'urgent',
-    title: 'Cães em terreno baldio',
-    location: 'Jardim Matarazzo',
-    address: 'Rua das Palmeiras, 412 — Jardim Matarazzo',
-    coordinates: { lat: -23.4981, lng: -46.4758 },
-    status: 'Equipe acionada',
-    reporter: 'Marta N.',
-    reporterSince: 'nov 2024',
-    reporterTotalReports: 9,
-    reporterReliability: 97,
-    elapsed: 'ontem',
-    triage: {
-      immediateRisk: 'Não',
-      activeAbuse: 'Sim',
-      trappedOrInjured: 'Não',
-      streetNoRisk: 'Não',
-      photoName: 'foto-terreno-baldio.jpg',
-    },
-    chat: [],
-  },
 ]
 
 const initialAnimals: AnimalItem[] = [
@@ -132,26 +86,6 @@ const initialAnimals: AnimalItem[] = [
     arrivalDate: '2026-04-10',
     traits: ['Vacinada', 'Castrada', 'Dócil'],
     requirements: ['Maior de 18 anos', 'Visita prévia'],
-    photos: [],
-  },
-  {
-    id: 'ani-2',
-    name: 'Girassol',
-    description: 'Felino · filhote',
-    size: 'Pequeno',
-    arrivalDate: '2026-06-01',
-    traits: ['Vacinada'],
-    requirements: ['Maior de 18 anos', 'Apartamento telado'],
-    photos: [],
-  },
-  {
-    id: 'ani-3',
-    name: 'Beethoven',
-    description: 'SRD · 4 anos',
-    size: 'Grande',
-    arrivalDate: '2026-02-19',
-    traits: ['Vacinada', 'Castrada'],
-    requirements: ['Maior de 18 anos', 'Quintal murado'],
     photos: [],
   },
 ]
@@ -171,48 +105,6 @@ const initialCandidates: Candidate[] = [
       { question: 'Já teve animais?', answer: 'Sim, cães adultos' },
     ],
   },
-  {
-    id: 'cand-2',
-    animalId: 'ani-1',
-    name: 'João Paulo',
-    pct: 58,
-    location: 'Centro',
-    summary: 'primeiro pet · apartamento compacto · híbrido',
-    status: 'pendente',
-    answers: [
-      { question: 'Rotina', answer: 'Trabalho híbrido (3x presencial)' },
-      { question: 'Espaço', answer: 'Apartamento sem varanda' },
-      { question: 'Já teve animais?', answer: 'Não' },
-    ],
-  },
-  {
-    id: 'cand-3',
-    animalId: 'ani-1',
-    name: 'Marta Nunes',
-    pct: 41,
-    location: 'Jardim Matarazzo',
-    summary: 'casa com quintal · ausente 8h/dia',
-    status: 'pendente',
-    answers: [
-      { question: 'Rotina', answer: 'Presencial 8h por dia' },
-      { question: 'Espaço', answer: 'Casa com quintal amplo' },
-      { question: 'Já teve animais?', answer: 'Sim' },
-    ],
-  },
-  {
-    id: 'cand-4',
-    animalId: 'ani-2',
-    name: 'Lucas Andrade',
-    pct: 82,
-    location: 'Centro',
-    summary: 'apto 100% telado · home office · já tem 1 gato dócil',
-    status: 'pendente',
-    answers: [
-      { question: 'Rotina', answer: 'Home office' },
-      { question: 'Espaço', answer: 'Apartamento telado' },
-      { question: 'Já teve animais?', answer: 'Sim, 1 gato castrado' },
-    ],
-  },
 ]
 
 const initialPosts: CommunityPost[] = [
@@ -226,46 +118,7 @@ const initialPosts: CommunityPost[] = [
     description: 'Sáb, 6 set · 8h–13h · Vila Marlene',
     progressText: '28 de 60 vagas',
     progressPct: 47,
-    subscribers: [
-      {
-        id: 'sub-1',
-        name: 'Renata Ferreira',
-        contact: '(11) 99812-3344',
-        detail: '1 cão (porte médio) · Horário 08h30',
-        status: 'Confirmado',
-      },
-    ],
-  },
-  {
-    id: 'post-2',
-    author: 'Abrigo Esperança',
-    isOwn: true,
-    type: 'Campanha',
-    categoryLabel: 'Doação',
-    title: 'Ração e cobertores',
-    description: 'Até 30 de setembro',
-    progressText: 'R$ 2.340 de R$ 5.000',
-    progressPct: 47,
     subscribers: [],
-  },
-  {
-    id: 'post-3',
-    author: 'Marta Nunes',
-    isOwn: false,
-    type: 'Post',
-    categoryLabel: 'Post',
-    title: 'Marta Nunes',
-    description: 'Achei essa gatinha perto da praça, sem coleira. Alguém reconhece?',
-    likes: 18,
-    elapsed: 'há 2h',
-    commentsList: [
-      {
-        id: 'c-1',
-        author: 'Renata Ferreira',
-        text: 'Vi um cartaz parecido perto da padaria central!',
-        timeAgo: 'há 1h',
-      },
-    ],
   },
 ]
 
@@ -532,41 +385,65 @@ function OrganizationLogin({
 function PasswordRecovery({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleRecovery(e: FormEvent) {
     e.preventDefault()
     if (!email.includes('@')) return
+    setIsSubmitting(true)
     try {
       await sendPasswordResetEmail(auth, email)
       setSent(true)
     } catch {
       setSent(true)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <main className="login-page">
-      <section className="login-form-panel" style={{ margin: 'auto' }}>
-        <div className="login-card">
-          <button type="button" className="back-login-button" onClick={onBack}>
-            &larr; Voltar para o login
-          </button>
-          {!sent ? (
-            <form className="login-form" onSubmit={handleRecovery}>
-              <h2>Redefinir senha</h2>
+    <main className="login-page" style={{ display: 'grid', placeItems: 'center', padding: '20px' }}>
+      <div className="login-card" style={{ background: '#fff', padding: '40px', borderRadius: '16px', maxWidth: '460px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{ background: 'none', border: 'none', color: '#334155', fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: '20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          &larr; Voltar para o login
+        </button>
+
+        {!sent ? (
+          <form className="login-form" onSubmit={handleRecovery} style={{ display: 'grid', gap: '16px' }}>
+            <div style={{ marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '24px', color: '#1e293b', marginBottom: '6px', fontWeight: 700 }}>Redefinir senha</h2>
+              <p style={{ fontSize: '13.5px', color: '#64748b' }}>Digite seu e-mail institucional cadastrado para receber o link de recuperação.</p>
+            </div>
+            <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+              E-mail institucional
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="E-mail institucional"
+                placeholder="exemplo@ong.org"
+                style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontWeight: 400 }}
+                required
+                autoFocus
               />
-              <button className="primary-button" type="submit">Enviar link</button>
-            </form>
-          ) : (
-            <div>Verifique seu e-mail para redefinir a senha.</div>
-          )}
-        </div>
-      </section>
+            </label>
+            <button className="primary-button" type="submit" disabled={isSubmitting} style={{ padding: '12px', marginTop: '8px' }}>
+              {isSubmitting ? 'Enviando...' : 'Enviar link de recuperação'}
+            </button>
+          </form>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <h2 style={{ fontSize: '22px', color: '#1e293b', marginBottom: '12px' }}>E-mail enviado!</h2>
+            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
+              Caso o e-mail informado esteja cadastrado, enviamos as instruções para a redefinição da sua senha.
+            </p>
+            <button className="primary-button" onClick={onBack} style={{ width: '100%' }}>Voltar para o login</button>
+          </div>
+        )}
+      </div>
     </main>
   )
 }
@@ -574,6 +451,7 @@ function PasswordRecovery({ onBack }: { onBack: () => void }) {
 function OrganizationAccreditation({ onBack }: { onBack: () => void }) {
   const [cnpj, setCnpj] = useState('')
   const [legalName, setLegalName] = useState('')
+  const [responsibleName, setResponsibleName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pixKey, setPixKey] = useState('')
@@ -583,14 +461,22 @@ function OrganizationAccreditation({ onBack }: { onBack: () => void }) {
   const [bylawsFile, setBylawsFile] = useState<File | null>(null)
   const [addressFile, setAddressFile] = useState<File | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!cnpjFile || !idFile || !addressFile) return
+    setErrorMessage(null)
+    if (!cnpjFile || !idFile || !addressFile) {
+      setErrorMessage('Por favor, envie todos os documentos obrigatórios.')
+      return
+    }
+    setIsSubmitting(true)
     try {
       await submitOrganizationAccreditation({
         cnpj,
         legalName,
+        responsibleName,
         institutionalEmail: email,
         password,
         documentName: cnpjFile.name,
@@ -599,157 +485,170 @@ function OrganizationAccreditation({ onBack }: { onBack: () => void }) {
         pixKey,
       })
       setSubmitted(true)
-    } catch {
-      setSubmitted(true)
+    } catch (error: any) {
+      console.error(error)
+      setErrorMessage(`Erro no credenciamento: ${error.message || error}`)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   if (submitted) {
     return (
       <main className="login-page" style={{ display: 'grid', placeItems: 'center', padding: '20px' }}>
-        <div className="login-card" style={{ background: '#fff', padding: '40px', borderRadius: '16px', textAlign: 'center', maxWidth: '480px', width: '100%' }}>
-          <h2 style={{ color: '#1e293b', marginBottom: '12px' }}>Credenciamento enviado!</h2>
-          <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px' }}>
-            Os seus documentos foram enviados para análise da moderação. Entraremos em contato em breve.
+        <div className="login-card" style={{ background: '#fff', padding: '40px', borderRadius: '16px', textAlign: 'center', maxWidth: '480px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ color: '#1e293b', marginBottom: '12px' }}>Credenciamento enviado com sucesso!</h2>
+          <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
+            Os seus dados e documentos foram enviados para análise da moderação. Você já pode entrar no painel com acesso restrito enquanto aguarda a aprovação.
           </p>
-          <button className="primary-button" onClick={onBack} style={{ width: '100%' }}>Voltar para o login</button>
+          <button className="primary-button" onClick={onBack} style={{ width: '100%' }}>Ir para o login</button>
         </div>
       </main>
     )
   }
 
   return (
-    <main className="login-page" style={{ padding: '40px 20px', overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-      <div className="login-card" style={{ background: '#fff', padding: '36px', borderRadius: '16px', maxWidth: '640px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+    <main className="login-page" style={{ padding: '40px 20px', overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div className="login-card" style={{ background: '#fff', padding: '36px', borderRadius: '16px', maxWidth: '600px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', margin: 'auto' }}>
         <button
           type="button"
           onClick={onBack}
-          style={{ background: 'none', border: 'none', color: '#64748b', fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: '16px', fontSize: '13px' }}
+          style={{ background: 'none', border: 'none', color: '#334155', fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: '20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           &larr; Voltar para o login
         </button>
 
-        <h2 style={{ fontSize: '22px', color: '#1e293b', marginBottom: '6px' }}>Solicitar credenciamento</h2>
+        <h2 style={{ fontSize: '24px', color: '#1e293b', marginBottom: '6px', fontWeight: 700 }}>Solicitar credenciamento</h2>
         <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '24px' }}>
           Preencha os dados institucionais e envie os documentos obrigatórios para validação da ONG.
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '16px' }}>
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>CNPJ ou Registro</div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            CNPJ ou Registro
             <input
               type="text"
               placeholder="00.000.000/0001-00"
               value={cnpj}
-              onChange={e => setCnpj(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+              onChange={e => setCnpj(formatOrganizationIdentifier(e.target.value))}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontWeight: 400 }}
               required
             />
-          </div>
+          </label>
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>Razão Social / Nome da ONG</div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            Razão Social / Nome da ONG
             <input
               type="text"
               placeholder="Ex: Abrigo Esperança"
               value={legalName}
               onChange={e => setLegalName(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontWeight: 400 }}
               required
             />
-          </div>
+          </label>
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>E-mail institucional</div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            Nome do Responsável Legal
+            <input
+              type="text"
+              placeholder="Ex: Ana Maria Souza"
+              value={responsibleName}
+              onChange={e => setResponsibleName(e.target.value)}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontWeight: 400 }}
+              required
+            />
+          </label>
+
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            E-mail institucional
             <input
               type="email"
               placeholder="contato@ong.org"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontWeight: 400 }}
               required
             />
-          </div>
+          </label>
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>Senha de acesso</div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            Senha de acesso
             <input
               type="password"
               placeholder="Mínimo de 6 caracteres"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontWeight: 400 }}
               required
             />
-          </div>
+          </label>
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>Chave Pix para doações</div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            Chave Pix para doações
             <input
               type="text"
               placeholder="CNPJ, e-mail ou chave aleatória"
               value={pixKey}
               onChange={e => setPixKey(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontWeight: 400 }}
               required
             />
-          </div>
+          </label>
 
           <div style={{ height: '1px', background: '#e2e8f0', margin: '8px 0' }} />
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>
-              1. CNPJ Ativo ou Comprovante de Registro <span style={{ color: 'red' }}>*</span>
-            </div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            1. CNPJ Ativo ou Comprovante de Registro <span style={{ color: '#ef4444' }}>*</span>
             <input
               type="file"
               onChange={e => setCnpjFile(e.target.files?.[0] || null)}
-              style={{ width: '100%', fontSize: '13px', padding: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+              style={{ width: '100%', fontSize: '13px', padding: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
               required
             />
-            {cnpjFile && <small style={{ color: '#166534', display: 'block', marginTop: '4px' }}>Selecionado: {cnpjFile.name}</small>}
-          </div>
+            {cnpjFile && <small style={{ color: '#166534', fontWeight: 500 }}>Selecionado: {cnpjFile.name}</small>}
+          </label>
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>
-              2. Documento de Identidade e CPF do Responsável <span style={{ color: 'red' }}>*</span>
-            </div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            2. Documento de Identidade e CPF do Responsável <span style={{ color: '#ef4444' }}>*</span>
             <input
               type="file"
               onChange={e => setIdFile(e.target.files?.[0] || null)}
-              style={{ width: '100%', fontSize: '13px', padding: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+              style={{ width: '100%', fontSize: '13px', padding: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
               required
             />
-            {idFile && <small style={{ color: '#166534', display: 'block', marginTop: '4px' }}>Selecionado: {idFile.name}</small>}
-          </div>
+            {idFile && <small style={{ color: '#166534', fontWeight: 500 }}>Selecionado: {idFile.name}</small>}
+          </label>
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>
-              3. Estatuto Social / Ata da Diretoria (Opcional)
-            </div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            3. Estatuto Social / Ata da Diretoria (Opcional)
             <input
               type="file"
               onChange={e => setBylawsFile(e.target.files?.[0] || null)}
-              style={{ width: '100%', fontSize: '13px', padding: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+              style={{ width: '100%', fontSize: '13px', padding: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
             />
-            {bylawsFile && <small style={{ color: '#166534', display: 'block', marginTop: '4px' }}>Selecionado: {bylawsFile.name}</small>}
-          </div>
+            {bylawsFile && <small style={{ color: '#166534', fontWeight: 500 }}>Selecionado: {bylawsFile.name}</small>}
+          </label>
 
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px', textTransform: 'uppercase' }}>
-              4. Comprovante de Endereço Recente da Sede <span style={{ color: 'red' }}>*</span>
-            </div>
+          <label style={{ display: 'grid', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>
+            4. Comprovante de Endereço Recente da Sede <span style={{ color: '#ef4444' }}>*</span>
             <input
               type="file"
               onChange={e => setAddressFile(e.target.files?.[0] || null)}
-              style={{ width: '100%', fontSize: '13px', padding: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+              style={{ width: '100%', fontSize: '13px', padding: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}
               required
             />
-            {addressFile && <small style={{ color: '#166534', display: 'block', marginTop: '4px' }}>Selecionado: {addressFile.name}</small>}
-          </div>
+            {addressFile && <small style={{ color: '#166534', fontWeight: 500 }}>Selecionado: {addressFile.name}</small>}
+          </label>
 
-          <button className="primary-button" type="submit" style={{ marginTop: '12px' }}>
-            Enviar para Moderação
+          {errorMessage && (
+            <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 500 }}>
+              {errorMessage}
+            </div>
+          )}
+
+          <button className="primary-button" type="submit" disabled={isSubmitting} style={{ marginTop: '12px', padding: '12px' }}>
+            {isSubmitting ? 'Enviando credenciamento...' : 'Enviar para Moderação'}
           </button>
         </form>
       </div>
@@ -762,7 +661,22 @@ function OrganizationLoginBlocked({ onResubmit, onBack }: { onResubmit: () => vo
 }
 
 function LoginError({ code }: { code: LoginErrorCode }) {
-  return <div className="login-error">Erro ao entrar ({code})</div>
+  let friendlyMessage = `Erro ao entrar (${code})`
+  if (code === 'not-found' || code === 'invalid-credential') {
+    friendlyMessage = 'E-mail, CNPJ ou senha incorretos. Verifique os dados inseridos.'
+  } else if (code === 'invalid-identifier') {
+    friendlyMessage = 'Por favor, informe um CNPJ ou e-mail válido.'
+  } else if (code === 'too-many-requests') {
+    friendlyMessage = 'Muitas tentativas incorretas. Tente novamente mais tarde.'
+  } else if (code === 'disabled') {
+    friendlyMessage = 'Esta conta foi desativada temporariamente.'
+  }
+
+  return (
+    <div className="login-error" style={{ background: '#fee2e2', color: '#991b1b', padding: '12px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, lineHeight: '1.4' }}>
+      {friendlyMessage}
+    </div>
+  )
 }
 
 function OrganizationDashboard({
@@ -779,7 +693,7 @@ function OrganizationDashboard({
     const saved = localStorage.getItem('weanimals_reports')
     return saved ? JSON.parse(saved) : initialReports
   })
-  const [selectedReportId, setSelectedReportId] = useState<number>(() => reports[0]?.id ?? 4468)
+  const [selectedReportId, setSelectedReportId] = useState<any>(() => reports[0]?.id ?? 4468)
 
   const [animals, setAnimals] = useState<AnimalItem[]>(() => {
     const saved = localStorage.getItem('weanimals_animals')
@@ -812,7 +726,7 @@ function OrganizationDashboard({
           cnpj: '00.000.000/0001-00',
           email: user.email || 'contato@abrigoesperanca.org',
           pixKey: user.email || 'doacoes@abrigoesperanca.org',
-          responsibleName: 'Renata Ferreira',
+          responsibleName: 'Responsável (Pendente)',
           verifiedAt: '12/03/2025',
           isVerified: true,
         }
@@ -833,19 +747,54 @@ function OrganizationDashboard({
   useEffect(() => {
     const unsubscribeReports = onSnapshot(collection(db, 'reports'), (snapshot) => {
       if (!snapshot.empty) {
-        const realReports = snapshot.docs.map(doc => ({
-          id: Number(doc.id) || doc.data().id,
-          ...doc.data()
-        })) as Report[]
+        const realReports = snapshot.docs.map((docSnap, index) => {
+          const data = docSnap.data()
+          
+          let panelPriority = 'Normal'
+          let panelPriorityClass = 'normal'
+          
+          if (data.urgency === 'Alta' || data.urgency === 'high') {
+            panelPriority = 'Muito urgente'
+            panelPriorityClass = 'very-urgent'
+          } else if (data.urgency === 'Média' || data.urgency === 'medium') {
+            panelPriority = 'Urgente'
+            panelPriorityClass = 'urgent'
+          }
+
+          const animal = data.animalType === 'dog' ? 'Cão' : data.animalType === 'cat' ? 'Gato' : data.animalType || 'Animal'
+          const title = data.title || `${animal} em perigo`
+
+          return {
+            ...data,
+            // Garante ID único combinando protocolo e id do doc do Firebase
+            id: docSnap.id || data.id || data.protocolNumber || `rep-${index}`,
+            title: title,
+            priority: panelPriority,
+            priorityClass: panelPriorityClass,
+            status: data.status || 'novo',
+            reporter: data.userName || data.reporter || 'Cidadão Anônimo',
+            description: data.description || 'Sem descrição detalhada.',
+            location: data.locationLabel || data.location || 'Localização via GPS',
+            address: data.address || 'Endereço não informado',
+            coordinates: { 
+              lat: data.latitude || -23.5505,
+              lng: data.longitude || -46.6333 
+            },
+            elapsed: data.elapsed || 'Recente',
+            chat: data.chat || []
+          }
+        }) as any
         setReports(realReports)
+      } else {
+        setReports([])
       }
     })
 
     const unsubscribeAnimals = onSnapshot(collection(db, 'animals'), (snapshot) => {
       if (!snapshot.empty) {
         const realAnimals = snapshot.docs.map(doc => ({
+          ...doc.data(),
           id: doc.id,
-          ...doc.data()
         })) as AnimalItem[]
         setAnimals(realAnimals)
       }
@@ -854,8 +803,8 @@ function OrganizationDashboard({
     const unsubscribeCandidates = onSnapshot(collection(db, 'candidates'), (snapshot) => {
       if (!snapshot.empty) {
         const realCandidates = snapshot.docs.map(doc => ({
+          ...doc.data(),
           id: doc.id,
-          ...doc.data()
         })) as Candidate[]
         setCandidates(realCandidates)
       }
@@ -864,8 +813,8 @@ function OrganizationDashboard({
     const unsubscribePosts = onSnapshot(collection(db, 'posts'), (snapshot) => {
       if (!snapshot.empty) {
         const realPosts = snapshot.docs.map(doc => ({
+          ...doc.data(),
           id: doc.id,
-          ...doc.data()
         })) as CommunityPost[]
         setPosts(realPosts)
       }
@@ -874,10 +823,25 @@ function OrganizationDashboard({
     const unsubscribeCheckIns = onSnapshot(collection(db, 'checkins'), (snapshot) => {
       if (!snapshot.empty) {
         const realCheckIns = snapshot.docs.map(doc => ({
+          ...doc.data(),
           id: doc.id,
-          ...doc.data()
         })) as CheckInRecord[]
         setCheckIns(realCheckIns)
+      }
+    })
+
+    const unsubscribeOrg = onSnapshot(doc(db, 'organizations', user.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const orgData = docSnap.data()
+        setProfile((prev) => ({
+          ...prev,
+          name: orgData.name ?? prev.name,
+          cnpj: orgData.cnpj ?? prev.cnpj,
+          email: orgData.email ?? prev.email,
+          pixKey: orgData.pixKey ?? prev.pixKey,
+          responsibleName: orgData.responsibleName ?? prev.responsibleName,
+          isVerified: orgData.isVerified ?? prev.isVerified,
+        }))
       }
     })
 
@@ -887,8 +851,9 @@ function OrganizationDashboard({
       unsubscribeCandidates()
       unsubscribePosts()
       unsubscribeCheckIns()
+      unsubscribeOrg()
     }
-  }, [])
+  }, [user.uid])
 
   useEffect(() => {
     localStorage.setItem('weanimals_reports', JSON.stringify(reports))
@@ -914,6 +879,16 @@ function OrganizationDashboard({
     localStorage.setItem('weanimals_profile', JSON.stringify(profile))
   }, [profile])
 
+  function handleLogout() {
+    localStorage.removeItem('weanimals_profile')
+    localStorage.removeItem('weanimals_reports')
+    localStorage.removeItem('weanimals_animals')
+    localStorage.removeItem('weanimals_candidates')
+    localStorage.removeItem('weanimals_posts')
+    localStorage.removeItem('weanimals_checkins')
+    onLogout()
+  }
+
   function pushNotification(title: string, message: string, targetSection: DashboardSection, type: AppNotification['type'] = 'info') {
     const newNotif: AppNotification = {
       id: `notif-${Date.now()}`,
@@ -927,169 +902,296 @@ function OrganizationDashboard({
     setNotifications((prev) => [newNotif, ...prev])
   }
 
-  // --- FUNÇÕES DE ESCRITA NO FIRESTORE ---
+  async function handleUpdateReportStatus(reportId: any, status: ReportStatus) {
+    let updatedReport: Report | undefined
 
-  async function handleUpdateReportStatus(reportId: number, status: ReportStatus) {
+    setReports((current) =>
+      current.map((report) => {
+        if (report.id === reportId) {
+          updatedReport = { ...report, status, elapsed: 'atualizado agora' }
+          return updatedReport
+        }
+        return report
+      }),
+    )
+    pushNotification('Denúncia Atualizada', `O status da denúncia mudou para "${status}".`, 'reports', 'urgent')
+
     try {
       const reportRef = doc(db, 'reports', String(reportId))
-      await updateDoc(reportRef, { status, elapsed: 'atualizado agora' })
-      pushNotification('Denúncia Atualizada', `O status da denúncia #${reportId} mudou para "${status}".`, 'reports', 'urgent')
+      if (updatedReport) {
+        await setDoc(reportRef, updatedReport, { merge: true })
+      } else {
+        await setDoc(reportRef, { status, elapsed: 'atualizado agora' }, { merge: true })
+      }
     } catch (error) {
-      console.error('Erro ao atualizar status da denúncia:', error)
+      console.error('Erro ao atualizar status da denúncia no Firebase:', error)
     }
   }
 
-  async function handleSendReportMessage(reportId: number, text: string) {
+  async function handleSendReportMessage(reportId: any, text: string) {
+    const novaMensagem = {
+      id: `msg-${Date.now()}`,
+      text,
+      mine: true,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }
+
+    let updatedReport: Report | undefined
+
+    setReports((current) =>
+      current.map((report) => {
+        if (report.id === reportId) {
+          updatedReport = {
+            ...report,
+            chat: [...(report.chat || []), novaMensagem],
+          }
+          return updatedReport
+        }
+        return report
+      }),
+    )
+
     try {
       const reportRef = doc(db, 'reports', String(reportId))
-      const novaMensagem = {
-        id: `msg-${Date.now()}`,
-        text,
-        mine: true,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      if (updatedReport) {
+        await setDoc(reportRef, updatedReport, { merge: true })
+      } else {
+        await updateDoc(reportRef, { chat: arrayUnion(novaMensagem) })
       }
-      await updateDoc(reportRef, {
-        chat: arrayUnion(novaMensagem)
-      })
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error)
+      console.error('Erro ao enviar mensagem para o Firebase:', error)
     }
   }
 
   async function handleAddAnimal(newAnimal: Omit<AnimalItem, 'id'>) {
+    const tempId = `ani-${Date.now()}`
+    const animalWithId: AnimalItem = { id: tempId, ...newAnimal }
+
+    setAnimals((prev) => [animalWithId, ...prev])
+    setSelectedAnimalId(tempId)
+    pushNotification('Novo Animal', `${newAnimal.name} foi cadastrado para adoção.`, 'animals', 'adoption')
+
     try {
-      await addDoc(collection(db, 'animals'), newAnimal)
-      pushNotification('Novo Animal', `${newAnimal.name} foi cadastrado para adoção.`, 'animals', 'adoption')
+      await setDoc(doc(db, 'animals', tempId), animalWithId)
     } catch (error) {
-      console.error('Erro ao adicionar animal:', error)
+      console.error('Erro ao adicionar animal no Firebase:', error)
     }
   }
 
   async function handleUpdateCandidateStatus(candidateId: string, status: CandidateStatus, justificationText?: string) {
-    try {
-      const candidateRef = doc(db, 'candidates', candidateId)
-      const updateData: any = { status }
-      if (justificationText) updateData.justification = justificationText
+    let updatedCandidate: Candidate | undefined
+    let generatedCheckIn: CheckInRecord | undefined
 
-      await updateDoc(candidateRef, updateData)
-
-      if (status === 'aprovado') {
-        const c = candidates.find((cand) => cand.id === candidateId)
-        if (c) {
-          const animalObj = animals.find((a) => a.id === c.animalId)
-          await addDoc(collection(db, 'checkins'), {
-            animal: animalObj ? animalObj.name : 'Pet',
-            adopter: c.name,
-            currentDays: 30,
-            status: 'Ótima',
-            reviewed: false,
-            reportsByPeriod: {
-              30: [{ label: 'Adaptação inicial (30d)', value: 'Adoção recém-aprovada' }],
-              90: [{ label: 'Status (90d)', value: 'Aguardando prazo' }],
-              180: [{ label: 'Status (180d)', value: 'Aguardando prazo' }],
+    setCandidates((prev) =>
+      prev.map((c) => {
+        if (c.id === candidateId) {
+          updatedCandidate = {
+            ...c,
+            status,
+            ...(justificationText ? { justification: justificationText } : {}),
+          }
+          if (status === 'aprovado') {
+            const animalObj = animals.find((a) => a.id === c.animalId)
+            generatedCheckIn = {
+              id: `chk-${Date.now()}`,
+              animal: animalObj ? animalObj.name : 'Pet',
+              adopter: c.name,
+              currentDays: 30,
+              status: 'Ótima',
+              reviewed: false,
+              reportsByPeriod: {
+                30: [{ label: 'Adaptação inicial (30d)', value: 'Adoção recém-aprovada' }],
+                90: [{ label: 'Status (90d)', value: 'Aguardando prazo' }],
+                180: [{ label: 'Status (180d)', value: 'Aguardando prazo' }],
+              },
             }
-          })
-          pushNotification('Adoção Aprovada!', `Check-in de 30 dias gerado para ${c.name}.`, 'checkins', 'checkin')
+          }
+          return updatedCandidate
         }
+        return c
+      }),
+    )
+
+    if (generatedCheckIn) {
+      const checkInToSave = generatedCheckIn
+      setCheckIns((chkPrev) => [checkInToSave, ...chkPrev])
+      pushNotification('Adoção Aprovada!', `Check-in de 30 dias gerado para ${checkInToSave.adopter}.`, 'checkins', 'checkin')
+    }
+
+    try {
+      if (updatedCandidate) {
+        await setDoc(doc(db, 'candidates', candidateId), updatedCandidate, { merge: true })
+      }
+      if (generatedCheckIn) {
+        await setDoc(doc(db, 'checkins', generatedCheckIn.id), generatedCheckIn)
       }
     } catch (error) {
-      console.error('Erro ao atualizar candidato:', error)
+      console.error('Erro ao atualizar candidato no Firebase:', error)
     }
   }
 
   async function handleSaveCommunityPost(postData: any) {
-    try {
-      if (postData.id) {
-        const postRef = doc(db, 'posts', postData.id)
-        await updateDoc(postRef, {
-          title: postData.title,
-          type: postData.type,
-          categoryLabel: postData.categoryLabel,
-          description: postData.description,
-          progressText: postData.progressText,
-        })
-      } else {
-        const newPost = {
-          author: profile.name,
-          isOwn: true,
-          type: postData.type,
-          categoryLabel: postData.categoryLabel,
-          title: postData.title,
-          description: postData.description,
-          progressText: postData.progressText,
-          progressPct: 10,
-          subscribers: [],
-          likes: 0,
-          commentsList: [],
-          elapsed: 'agora',
+    if (postData.id) {
+      let updatedPost: CommunityPost | undefined
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postData.id) {
+            updatedPost = {
+              ...p,
+              title: postData.title,
+              type: postData.type,
+              categoryLabel: postData.categoryLabel,
+              description: postData.description,
+              progressText: postData.progressText,
+            }
+            return updatedPost
+          }
+          return p
+        }),
+      )
+      try {
+        if (updatedPost) {
+          await setDoc(doc(db, 'posts', postData.id), updatedPost, { merge: true })
         }
-        await addDoc(collection(db, 'posts'), newPost)
-        pushNotification('Nova Campanha', `"${postData.title}" foi publicada na comunidade.`, 'community', 'info')
+      } catch (error) {
+        console.error('Erro ao editar post no Firebase:', error)
       }
-    } catch (error) {
-      console.error('Erro ao salvar post:', error)
+    } else {
+      const newPost: CommunityPost = {
+        id: `post-${Date.now()}`,
+        author: profile.name,
+        isOwn: true,
+        type: postData.type,
+        categoryLabel: postData.categoryLabel,
+        title: postData.title,
+        description: postData.description,
+        progressText: postData.progressText,
+        progressPct: 10,
+        subscribers: [],
+        likes: 0,
+        commentsList: [],
+        elapsed: 'agora',
+      }
+      setPosts((prev) => [newPost, ...prev])
+      pushNotification('Nova Campanha', `"${postData.title}" foi publicada na comunidade.`, 'community', 'info')
+
+      try {
+        await setDoc(doc(db, 'posts', newPost.id), newPost)
+      } catch (error) {
+        console.error('Erro ao criar post no Firebase:', error)
+      }
     }
   }
 
   async function handleDeleteCommunityPost(id: string) {
+    setPosts((prev) => prev.filter((p) => p.id !== id))
     try {
       await deleteDoc(doc(db, 'posts', id))
     } catch (error) {
-      console.error('Erro ao excluir post:', error)
+      console.error('Erro ao excluir post no Firebase:', error)
     }
   }
 
   async function handleLikeCommunityPost(id: string) {
+    let updatedPost: CommunityPost | undefined
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          updatedPost = { ...p, likes: (p.likes ?? 0) + 1 }
+          return updatedPost
+        }
+        return p
+      }),
+    )
     try {
-      const postRef = doc(db, 'posts', id)
-      const post = posts.find((p) => p.id === id)
-      if (post) {
-        await updateDoc(postRef, { likes: (post.likes ?? 0) + 1 })
+      if (updatedPost) {
+        await setDoc(doc(db, 'posts', id), updatedPost, { merge: true })
       }
     } catch (error) {
-      console.error('Erro ao curtir post:', error)
+      console.error('Erro ao curtir post no Firebase:', error)
     }
   }
 
   async function handleAddPostComment(postId: string, text: string) {
+    const newComment = {
+      id: `c-${Date.now()}`,
+      author: profile.name,
+      text,
+      timeAgo: 'agora',
+    }
+    let updatedPost: CommunityPost | undefined
+
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === postId) {
+          updatedPost = {
+            ...p,
+            commentsList: [...(p.commentsList ?? []), newComment],
+          }
+          return updatedPost
+        }
+        return p
+      }),
+    )
+
     try {
-      const postRef = doc(db, 'posts', postId)
-      await updateDoc(postRef, {
-        commentsList: arrayUnion({
-          id: `c-${Date.now()}`,
-          author: profile.name,
-          text,
-          timeAgo: 'agora',
-        })
-      })
+      if (updatedPost) {
+        await setDoc(doc(db, 'posts', postId), updatedPost, { merge: true })
+      }
     } catch (error) {
-      console.error('Erro ao adicionar comentário:', error)
+      console.error('Erro ao comentar post no Firebase:', error)
     }
   }
 
   async function handleAddCampaignSubscriber(postId: string, subscriber: { name: string; contact: string; detail: string }) {
+    const newSub = {
+      id: `sub-${Date.now()}`,
+      name: subscriber.name,
+      contact: subscriber.contact,
+      detail: subscriber.detail,
+      status: 'Confirmado',
+    }
+    let updatedPost: CommunityPost | undefined
+
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === postId) {
+          updatedPost = {
+            ...p,
+            subscribers: [...(p.subscribers ?? []), newSub],
+          }
+          return updatedPost
+        }
+        return p
+      }),
+    )
+
     try {
-      const postRef = doc(db, 'posts', postId)
-      await updateDoc(postRef, {
-        subscribers: arrayUnion({
-          id: `sub-${Date.now()}`,
-          name: subscriber.name,
-          contact: subscriber.contact,
-          detail: subscriber.detail,
-          status: 'Confirmado',
-        })
-      })
+      if (updatedPost) {
+        await setDoc(doc(db, 'posts', postId), updatedPost, { merge: true })
+      }
     } catch (error) {
-      console.error('Erro ao adicionar inscrito:', error)
+      console.error('Erro ao adicionar inscrito no Firebase:', error)
     }
   }
 
   async function handleMarkCheckInReviewed(id: string) {
+    let updatedCheckIn: CheckInRecord | undefined
+    setCheckIns((prev) =>
+      prev.map((c) => {
+        if (c.id === id) {
+          updatedCheckIn = { ...c, reviewed: true }
+          return updatedCheckIn
+        }
+        return c
+      }),
+    )
     try {
-      const checkinRef = doc(db, 'checkins', id)
-      await updateDoc(checkinRef, { reviewed: true })
+      if (updatedCheckIn) {
+        await setDoc(doc(db, 'checkins', id), updatedCheckIn, { merge: true })
+      }
     } catch (error) {
-      console.error('Erro ao atualizar check-in:', error)
+      console.error('Erro ao revisar check-in no Firebase:', error)
     }
   }
 
@@ -1118,7 +1220,7 @@ function OrganizationDashboard({
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       onNavigate={setSection}
-      onLogout={onLogout}
+      onLogout={handleLogout}
       onMarkNotificationsAsRead={handleMarkNotificationsAsRead}
     >
       {section === 'home' && (
@@ -1181,11 +1283,23 @@ function OrganizationDashboard({
       {section === 'profile' && (
         <Profile
           profile={profile}
-          onUpdateProfile={(updated) => {
+          onUpdateProfile={async (updated) => {
             setProfile(updated)
-            pushNotification('Perfil Atualizado', 'Os dados institucionais foram salvos.', 'profile', 'info')
+            pushNotification('Perfil Atualizado', 'Os dados institucionais foram salvos no sistema.', 'profile', 'info')
+            
+            try {
+              await setDoc(doc(db, 'organizations', user.uid), {
+                name: updated.name,
+                cnpj: updated.cnpj,
+                email: updated.email,
+                pixKey: updated.pixKey,
+                responsibleName: updated.responsibleName
+              }, { merge: true })
+            } catch (error) {
+              console.error('Erro ao atualizar perfil no Firebase:', error)
+            }
           }}
-          onLogout={onLogout}
+          onLogout={handleLogout}
         />
       )}
     </DashboardLayout>

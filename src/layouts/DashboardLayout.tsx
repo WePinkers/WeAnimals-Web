@@ -123,7 +123,6 @@ export function DashboardLayout({
           <NavButton section="community" label="Comunidade" />
           <NavButton section="animals" label="Animais" badgeCount={badges.animals} />
           <NavButton section="checkins" label="Check-ins" badgeCount={badges.checkins} />
-          <NavButton section="profile" label="Perfil" />
         </nav>
 
         <div

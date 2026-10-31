@@ -1,8 +1,7 @@
-import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
 
-// Variável para evitar múltiplos cliques / carregamentos
 let authMutationInProgress = false
 
 export function isOrganizationAuthMutationInProgress() {
@@ -12,6 +11,7 @@ export function isOrganizationAuthMutationInProgress() {
 export async function submitOrganizationAccreditation(data: {
   cnpj: string
   legalName: string
+  responsibleName: string
   institutionalEmail: string
   password: string
   documentName: string
@@ -22,7 +22,6 @@ export async function submitOrganizationAccreditation(data: {
   authMutationInProgress = true
 
   try {
-    // 1. Criar o utilizador no Firebase Authentication
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       data.institutionalEmail,
@@ -30,21 +29,24 @@ export async function submitOrganizationAccreditation(data: {
     )
     const user = userCredential.user
 
-    // 2. Salvar os dados da ONG no Firestore 
-    // Nota: isVerified entra como FALSE para bloquear a navegação!
+    // MANTÉM O FLUXO REAL: Novas contas entram como não verificadas
     await setDoc(doc(db, 'organizations', user.uid), {
       name: data.legalName,
       cnpj: data.cnpj,
       email: data.institutionalEmail,
       pixKey: data.pixKey,
-      responsibleName: 'Responsável (Pendente)',
+      responsibleName: data.responsibleName,
       verifiedAt: 'Aguardando moderação',
-      isVerified: false, // <-- Isto tranca o painel da ONG!
+      isVerified: false,
     })
 
-    // (Opcional) Aqui entraria o upload dos PDFs/Imagens para o Firebase Storage.
-    // Para fins do TCC, gravar os nomes dos ficheiros no Firestore ou apenas simular já é suficiente!
-    console.log('Documentos recebidos para análise:', data.documentName)
+    // Salva o mapeamento de CNPJ para E-mail
+    const cleanCnpj = data.cnpj.replace(/\D/g, '')
+    await setDoc(doc(db, 'cnpj_mapping', cleanCnpj), {
+      email: data.institutionalEmail
+    })
+
+    await signInWithEmailAndPassword(auth, data.institutionalEmail, data.password)
 
     return user
   } catch (error) {

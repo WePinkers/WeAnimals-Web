@@ -1,154 +1,90 @@
-import {
-  browserLocalPersistence,
-  browserSessionPersistence,
-  setPersistence,
-  signInAnonymously,
-  signInWithEmailAndPassword,
-  signOut,
-  type User,
-} from 'firebase/auth'
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  query,
-  where,
-} from 'firebase/firestore'
+import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence, browserSessionPersistence, type User } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
 
-const ORGANIZATION_IDENTIFIER_COLLECTION = 'organization_identifiers'
-const ORGANIZATION_VERIFICATION_COLLECTION =
-  'organization_verification_requests'
-const ORGANIZATION_ACCOUNTS_COLLECTION = 'organization_accounts'
-const TEMPORARY_CNPJ = '62075431000174'
-const TEMPORARY_EMAIL = 'alissanovais@gmail.com'
-
-let organizationLoginMutationInProgress = false
+export type LoginErrorCode =
+  | 'invalid-identifier'
+  | 'not-found'
+  | 'invalid-credential'
+  | 'email-not-verified'
+  | 'pending'
+  | 'too-many-requests'
+  | 'disabled'
+  | 'generic'
 
 export class OrganizationAuthError extends Error {
-  readonly code: string
+  code: LoginErrorCode
 
-  constructor(code: string) {
-    super(code)
+  constructor(code: LoginErrorCode, message: string) {
+    super(message)
     this.code = code
-    this.name = 'OrganizationAuthError'
   }
 }
+
+let loginMutationInProgress = false
 
 export function isOrganizationLoginMutationInProgress() {
-  return organizationLoginMutationInProgress
-}
-
-function normalizeCnpj(value: string) {
-  return value.replace(/\D/g, '')
-}
-
-async function sha256(value: string) {
-  const bytes = new TextEncoder().encode(value)
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-async function resolveOrganizationEmail(identifier: string) {
-  const trimmedIdentifier = identifier.trim()
-
-  if (trimmedIdentifier.includes('@')) {
-    return {
-      email: trimmedIdentifier.toLowerCase(),
-      isTemporaryAccess: false,
-    }
-  }
-
-  const normalizedCnpj = normalizeCnpj(trimmedIdentifier)
-  if (normalizedCnpj.length !== 14) {
-    throw new OrganizationAuthError('invalid-identifier')
-  }
-
-  const isTemporaryAccess =
-    import.meta.env.DEV && normalizedCnpj === TEMPORARY_CNPJ
-
-  if (isTemporaryAccess) {
-    return { email: TEMPORARY_EMAIL, isTemporaryAccess: true }
-  }
-
-  if (!auth.currentUser) {
-    await signInAnonymously(auth)
-  }
-
-  const identifierSnapshot = await getDoc(
-    doc(
-      db,
-      ORGANIZATION_IDENTIFIER_COLLECTION,
-      await sha256(normalizedCnpj),
-    ),
-  )
-
-  const email = identifierSnapshot.get('email')
-  if (!email) {
-    throw new OrganizationAuthError('not-found')
-  }
-
-  return { email, isTemporaryAccess: false }
+  return loginMutationInProgress
 }
 
 export async function signInOrganization(
   identifier: string,
   password: string,
-  rememberConnected: boolean,
+  rememberConnected: boolean
 ): Promise<User> {
-  organizationLoginMutationInProgress = true
+  loginMutationInProgress = true
+  const trimmed = identifier.trim()
 
   try {
-    await setPersistence(
-      auth,
-      rememberConnected ? browserLocalPersistence : browserSessionPersistence,
-    )
+    const persistenceType = rememberConnected ? browserLocalPersistence : browserSessionPersistence
+    await setPersistence(auth, persistenceType)
 
-    const { email, isTemporaryAccess } =
-      await resolveOrganizationEmail(identifier)
-    const credential = await signInWithEmailAndPassword(auth, email, password)
-    const user = credential.user
+    let emailToUse = trimmed
 
-    await user.reload()
-    if (!user.emailVerified) {
-      await signOut(auth)
-      throw new OrganizationAuthError('email-not-verified')
+    // NOVO: Se o identificador não tiver '@', assume que é um CNPJ
+    if (!trimmed.includes('@')) {
+      const cleanCnpj = trimmed.replace(/\D/g, '')
+      const mappingDoc = await getDoc(doc(db, 'cnpj_mapping', cleanCnpj))
+      
+      if (mappingDoc.exists()) {
+        emailToUse = mappingDoc.data().email // Encontrou o e-mail associado a este CNPJ!
+      } else {
+        throw new OrganizationAuthError('not-found', 'CNPJ não encontrado no sistema.')
+      }
     }
 
-    const tokenResult = await user.getIdTokenResult()
-    const isAdmin = tokenResult.claims.admin === true
+    // Faz o login no Firebase Authentication com o e-mail descoberto
+    const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password)
+    const user = userCredential.user
 
-    if (!isTemporaryAccess && !isAdmin) {
-      const pendingSnapshot = await getDocs(
-        query(
-          collection(db, ORGANIZATION_VERIFICATION_COLLECTION),
-          where('requesterId', '==', user.uid),
-          where('status', '==', 'pending'),
-          limit(1),
-        ),
-      )
-      const accountSnapshot = await getDoc(
-        doc(db, ORGANIZATION_ACCOUNTS_COLLECTION, user.uid),
-      )
-      const accountStatus = accountSnapshot.get('status')
-
-      if (
-        !pendingSnapshot.empty ||
-        !accountSnapshot.exists() ||
-        accountStatus !== 'approved'
-      ) {
-        await signOut(auth)
-        throw new OrganizationAuthError('pending')
+    // Verifica dados complementares da ONG no Firestore
+    const orgDocRef = doc(db, 'organizations', user.uid)
+    const orgSnap = await getDoc(orgDocRef)
+    
+    if (orgSnap.exists()) {
+      const orgData = orgSnap.data()
+      if (orgData.disabled) {
+        throw new OrganizationAuthError('disabled', 'Conta desativada.')
       }
     }
 
     return user
+  } catch (error: any) {
+    console.error('Erro no login da organização:', error)
+    
+    if (error instanceof OrganizationAuthError) {
+      throw error
+    }
+
+    const code = error.code
+    if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+      throw new OrganizationAuthError('invalid-credential', 'E-mail, CNPJ ou senha incorretos.')
+    } else if (code === 'auth/too-many-requests') {
+      throw new OrganizationAuthError('too-many-requests', 'Muitas tentativas. Tente mais tarde.')
+    } else {
+      throw new OrganizationAuthError('generic', error.message || 'Erro ao entrar.')
+    }
   } finally {
-    organizationLoginMutationInProgress = false
+    loginMutationInProgress = false
   }
 }
