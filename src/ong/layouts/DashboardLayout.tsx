@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
 import type { DashboardSection, AppNotification } from '../types'
+import { SupportChatWidget } from '../components/SupportChatWidget'
 
 interface DashboardLayoutProps {
   user: User
   organizationName: string
   organizationEmail: string
+  isVerified: boolean
   currentSection: DashboardSection
   notifications: AppNotification[]
   badges: {
@@ -25,6 +27,7 @@ export function DashboardLayout({
   user,
   organizationName,
   organizationEmail,
+  isVerified,
   currentSection,
   notifications,
   badges,
@@ -37,6 +40,7 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isNotifMenuOpen, setIsNotifMenuOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const orgMenuRef = useRef<HTMLDivElement>(null)
   const notifMenuRef = useRef<HTMLDivElement>(null)
@@ -65,25 +69,51 @@ export function DashboardLayout({
     section: DashboardSection
     label: string
     badgeCount?: number
-  }) => (
-    <button
-      type="button"
-      className={`nav ${currentSection === section ? 'on' : ''}`}
-      onClick={() => {
-        onNavigate(section)
-        setIsNotifMenuOpen(false)
-      }}
-    >
-      {label}
-      {badgeCount !== undefined && badgeCount > 0 ? <b>{badgeCount}</b> : null}
-    </button>
-  )
+  }) => {
+    const isLocked = !isVerified && section !== 'home' && section !== 'profile'
+
+    return (
+      <button
+        type="button"
+        className={`nav ${currentSection === section ? 'on' : ''}`}
+        onClick={() => {
+          if (isLocked) {
+            alert('Esta funcionalidade está temporariamente bloqueada até que a moderação aprove o cadastro da sua ONG.')
+            return
+          }
+          onNavigate(section)
+          setIsNotifMenuOpen(false)
+          setIsMobileMenuOpen(false)
+        }}
+        style={isLocked ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+      >
+        <span>{label} {isLocked && '🔒'}</span>
+        {badgeCount !== undefined && badgeCount > 0 && !isLocked ? <b>{badgeCount}</b> : null}
+      </button>
+    )
+  }
 
   return (
     <div className="portal-shell">
-      <aside className="portal-sidebar">
-        <div className="logo">
-          <i />
+      {isMobileMenuOpen && (
+        <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} />
+      )}
+
+      <aside className={`portal-sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+        <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img
+            src="/weanimals-entry-silhouette.png"
+            alt="WeAnimals"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              objectFit: 'contain',
+              padding: '4px',
+              background: '#d4a373',
+              flexShrink: 0,
+            }}
+          />
           WeAnimals
         </div>
 
@@ -93,10 +123,8 @@ export function DashboardLayout({
           <NavButton section="community" label="Comunidade" />
           <NavButton section="animals" label="Animais" badgeCount={badges.animals} />
           <NavButton section="checkins" label="Check-ins" badgeCount={badges.checkins} />
-          <NavButton section="profile" label="Perfil" />
         </nav>
 
-        {/* CARD DA CONTA COM AVATAR / INICIAL DINÂMICA */}
         <div
           className="org"
           ref={orgMenuRef}
@@ -131,7 +159,9 @@ export function DashboardLayout({
             <b style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {organizationName}
             </b>
-            <span>✓ Verificada</span>
+            <span style={{ color: isVerified ? '#22c55e' : '#eab308' }}>
+              {isVerified ? '✓ Verificada' : '⏳ Pendente de aprovação'}
+            </span>
           </div>
 
           <div
@@ -152,19 +182,19 @@ export function DashboardLayout({
                 onNavigate('profile')
               }}
             >
-              <svg viewBox="0 0 24 24">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
               Configurações do perfil
+            </div>
+            <div
+              className="org-item"
+              onClick={() => {
+                setIsOrgMenuOpen(false)
+                onLogout()
+              }}
+            >
+              Adicionar outra conta
             </div>
             <div style={{ height: 1, background: 'var(--ln)', margin: '4px 0' }} />
             <div className="org-item" style={{ color: 'var(--a6)' }} onClick={onLogout}>
-              <svg viewBox="0 0 24 24" style={{ stroke: 'var(--a6)' }}>
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
               Sair
             </div>
           </div>
@@ -173,6 +203,19 @@ export function DashboardLayout({
 
       <main className="portal-main">
         <header className="top">
+          <button
+            type="button"
+            className="mobile-menu-toggle"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Abrir menu"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
           <input
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -180,33 +223,17 @@ export function DashboardLayout({
             aria-label="Buscar no painel"
           />
 
-          <div
-            style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '16px' }}
-            ref={notifMenuRef}
-          >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '16px' }} ref={notifMenuRef}>
             <div
               className={`bell ${!hasUnread ? 'read' : ''}`}
               onClick={() => setIsNotifMenuOpen(!isNotifMenuOpen)}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ color: 'var(--i6)' }}
-              >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--i6)' }}>
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
               </svg>
 
-              <div
-                className={`notif-menu ${isNotifMenuOpen ? 'show' : ''}`}
-                onClick={(e) => e.stopPropagation()}
-              >
+              <div className={`notif-menu ${isNotifMenuOpen ? 'show' : ''}`} onClick={(e) => e.stopPropagation()}>
                 <div className="notif-head">
                   Notificações
                   <button
@@ -218,7 +245,6 @@ export function DashboardLayout({
                     Marcar lidas
                   </button>
                 </div>
-
                 {notifications.length === 0 ? (
                   <div style={{ padding: '16px', textAlign: 'center', color: 'var(--i6)', fontSize: 13 }}>
                     Nenhuma notificação no momento.
@@ -233,25 +259,6 @@ export function DashboardLayout({
                         setIsNotifMenuOpen(false)
                       }}
                     >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: 4,
-                        }}
-                      >
-                        {notif.type === 'urgent' && <span className="pill novo">Urgente</span>}
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--i6)',
-                            marginLeft: notif.type !== 'urgent' ? 'auto' : 0,
-                          }}
-                        >
-                          {notif.timeAgo}
-                        </span>
-                      </div>
                       <b>{notif.title}:</b> {notif.message}
                     </div>
                   ))
@@ -261,8 +268,17 @@ export function DashboardLayout({
           </div>
         </header>
 
+        {!isVerified && (
+          <div style={{ background: '#fef9c3', color: '#854d0e', padding: '12px 24px', fontSize: '13px', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #fde047' }}>
+            <span>⚠️ A sua conta está pendente de aprovação pela moderação. O envio de documentos foi encaminhado para o administrador.</span>
+            <button onClick={() => onNavigate('profile')} style={{ background: '#854d0e', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Ver Perfil</button>
+          </div>
+        )}
+
         {children}
       </main>
+
+      <SupportChatWidget organizationName={organizationName} />
     </div>
   )
 }
