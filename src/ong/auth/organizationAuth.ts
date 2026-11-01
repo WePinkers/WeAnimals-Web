@@ -21,6 +21,8 @@ import { isConfiguredAdminEmail } from '../../admin/adminAccess'
 const ORGANIZATION_VERIFICATION_COLLECTION =
   'organization_verification_requests'
 const ORGANIZATION_ACCOUNTS_COLLECTION = 'organization_accounts'
+const TEMPORARY_CNPJ = '62075431000174'
+const TEMPORARY_EMAIL = 'alissanovais@gmail.com'
 
 export type LoginErrorCode =
   | 'invalid-identifier'
@@ -62,7 +64,11 @@ export async function signInOrganization(
     let emailToUse = trimmed
 
     // NOVO: Se o identificador não tiver '@', assume que é um CNPJ
-    if (!trimmed.includes('@')) {
+    const cleanCnpj = trimmed.replace(/\D/g, '')
+    const isTemporaryAccess =
+      import.meta.env.DEV && cleanCnpj === TEMPORARY_CNPJ
+
+    if (!trimmed.includes('@') && !isTemporaryAccess) {
       const cleanCnpj = trimmed.replace(/\D/g, '')
       const mappingDoc = await getDoc(doc(db, 'cnpj_mapping', cleanCnpj))
       
@@ -71,6 +77,8 @@ export async function signInOrganization(
       } else {
         throw new OrganizationAuthError('not-found', 'CNPJ não encontrado no sistema.')
       }
+    } else if (isTemporaryAccess) {
+      emailToUse = TEMPORARY_EMAIL
     }
 
     // Faz o login no Firebase Authentication com o e-mail descoberto
@@ -82,7 +90,7 @@ export async function signInOrganization(
     const isAdmin =
       isConfiguredAdminEmail(user.email) || tokenResult.claims.admin === true
 
-    if (!isAdmin && !user.emailVerified) {
+    if (!isAdmin && !isTemporaryAccess && !user.emailVerified) {
       await signOut(auth)
       throw new OrganizationAuthError('email-not-verified')
     }
@@ -99,7 +107,7 @@ export async function signInOrganization(
       }
     }
 
-    if (!isAdmin) {
+    if (!isAdmin && !isTemporaryAccess) {
       const pendingSnapshot = await getDocs(
         query(
           collection(db, ORGANIZATION_VERIFICATION_COLLECTION),

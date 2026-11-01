@@ -36,6 +36,7 @@ import { Community } from './ong/pages/Community'
 import { Animals } from './ong/pages/Animals'
 import { CheckIns } from './ong/pages/CheckIns'
 import { Profile } from './ong/pages/Profile'
+import { LegacyOrganizationLogin } from './ong/components/LegacyLoginScreens'
 import type {
   LoginErrorCode,
   DashboardSection,
@@ -261,7 +262,7 @@ function OrganizationPortalApp() {
   return user ? (
     <OrganizationDashboard user={user} onLogout={() => signOut(auth)} />
   ) : (
-    <OrganizationLogin onAuthenticated={setUser} />
+    <LegacyOrganizationLogin onAuthenticated={setUser} />
   )
 }
 
@@ -317,7 +318,7 @@ function PasswordVisibilityIcon({ hidden }: { hidden: boolean }) {
   )
 }
 
-function OrganizationLogin({
+export function OrganizationLogin({
   onAuthenticated,
 }: {
   onAuthenticated: (user: User) => void
