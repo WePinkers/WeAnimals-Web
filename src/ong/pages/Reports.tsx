@@ -302,6 +302,26 @@ export function Reports({
               </span>
             </div>
 
+            <div
+              style={{
+                marginTop: 10,
+                padding: '9px 12px',
+                borderRadius: 8,
+                background: selectedReport.assignedOrganizationName ? '#edf6f0' : '#f8fafc',
+                border: '1px solid var(--ln)',
+                color: 'var(--i6)',
+                fontSize: 12,
+              }}
+            >
+              {selectedReport.assignedOrganizationName ? (
+                <>
+                  Denúncia atribuída a <strong>{selectedReport.assignedOrganizationName}</strong>.
+                </>
+              ) : (
+                'Esta denúncia ainda não foi atribuída a uma ONG ou abrigo.'
+              )}
+            </div>
+
             <div className="mono-label" style={{ marginTop: 12 }}>
               Atualizar status (atual: {selectedReport.status})
             </div>
@@ -337,7 +357,7 @@ export function Reports({
                 className="brown-button"
                 onClick={() => setShowChat((visible) => !visible)}
               >
-                Falar com quem denunciou ({selectedReport.chat?.length || 0})
+                Falar com quem denunciou ({selectedReport.teamMessageCount || 0})
               </button>
               <button
                 type="button"
@@ -477,9 +497,12 @@ export function Reports({
                     </div>
                   ) : (
                     selectedReport.chat.map((msg: any) => (
-                      <p key={msg.id || Math.random()} className={msg.mine ? 'mine' : ''}>
-                        {msg.text}
-                      </p>
+                      <div key={msg.id} style={{ display: 'grid', gap: 2 }}>
+                        <small style={{ color: 'var(--i6)', fontSize: 10 }}>
+                          {msg.senderName || (msg.mine ? 'Sua equipe' : 'Denunciante')} · {msg.timestamp || ''}
+                        </small>
+                        <p className={msg.mine ? 'mine' : ''}>{msg.text}</p>
+                      </div>
                     ))
                   )}
                 </div>

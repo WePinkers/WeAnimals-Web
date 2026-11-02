@@ -1407,6 +1407,11 @@ button {
   background: #f8eac5;
 }
 
+.priority-badge.low {
+  color: var(--p7);
+  background: var(--s1);
+}
+
 .priority-badge.ok,
 .pill.ok {
   color: var(--p7);

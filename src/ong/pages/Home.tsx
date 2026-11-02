@@ -75,7 +75,7 @@ export function Home({
                 <span className="attention-icon urgent-icon">!</span>
                 <span>
                   <strong>
-                    Denúncia #{report.id} · {report.title} ({report.location})
+                    Denúncia #{report.protocolNumber ?? report.id} · {report.title} ({report.location})
                   </strong>
                   <small>
                     {report.status} · {report.elapsed}

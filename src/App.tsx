@@ -13,10 +13,12 @@ import {
   setDoc,
   updateDoc, 
   deleteDoc, 
-  arrayUnion,
+  increment,
+  orderBy,
   query,
   where,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore'
 import './ong/app.css'
 import AdminApp from './admin/AdminApp'
@@ -46,6 +48,7 @@ import type {
   DashboardSection,
   ReportStatus,
   Report,
+  ChatMessage,
   AppNotification,
   AnimalItem,
   Candidate,
@@ -308,6 +311,59 @@ function formatOrganizationIdentifier(value: string) {
     '-' +
     digits.slice(12)
   )
+}
+
+type ReportPriorityPresentation = {
+  label: string
+  className: 'very-urgent' | 'urgent' | 'priority' | 'low'
+}
+
+function normalizedClassification(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
+function reportPriorityFromClassification(data: Record<string, any>): ReportPriorityPresentation {
+  const calculatedClassification =
+    data.triageClassification ??
+    data.calculatedClassification ??
+    data.classificationCalculated ??
+    data.classification
+  const classification = normalizedClassification(calculatedClassification)
+
+  // A classificação calculada pela triagem é a fonte principal da prioridade.
+  if (
+    classification.includes('very_urgent') ||
+    classification.includes('muito_urgente') ||
+    classification.includes('critical') ||
+    classification.includes('critica')
+  ) {
+    return { label: 'Muito urgente', className: 'very-urgent' }
+  }
+  if (classification === 'urgent' || classification.includes('urgente')) {
+    return { label: 'Urgente', className: 'urgent' }
+  }
+  if (classification === 'priority' || classification.includes('prioridade')) {
+    return { label: 'Prioridade', className: 'priority' }
+  }
+  if (classification === 'low' || classification.includes('baixa_urgencia')) {
+    return { label: 'Baixa urgência', className: 'low' }
+  }
+
+  // Compatibilidade com denúncias antigas que ainda não têm a classificação.
+  const informedUrgency = normalizedClassification(data.urgency)
+  if (informedUrgency === 'high' || informedUrgency === 'alta') {
+    return { label: 'Muito urgente', className: 'very-urgent' }
+  }
+  if (informedUrgency === 'medium' || informedUrgency === 'media') {
+    return { label: 'Urgente', className: 'urgent' }
+  }
+  return { label: 'Baixa urgência', className: 'low' }
 }
 
 function PasswordVisibilityIcon({ hidden }: { hidden: boolean }) {
@@ -803,6 +859,7 @@ function OrganizationDashboard({
   const [searchQuery, setSearchQuery] = useState('')
 
   const [reports, setReports] = useState<Report[]>([])
+  const [reportMessages, setReportMessages] = useState<Record<string, ChatMessage[]>>({})
   const [reportsError, setReportsError] = useState<string | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<any>(
     () => reports[0]?.id ?? initialReports[0]?.id ?? 4468,
@@ -875,19 +932,19 @@ function OrganizationDashboard({
     const unsubscribeReports = onSnapshot(authenticatedReportsQuery, (snapshot) => {
       setReportsError(null)
       if (!snapshot.empty) {
+        const reporterCounts = new Map<string, number>()
+        snapshot.docs.forEach((reportDoc) => {
+          const reportData = reportDoc.data()
+          const reporterId = reportData.userId || reportData.reporterId
+          if (typeof reporterId === 'string' && reporterId.trim()) {
+            reporterCounts.set(reporterId, (reporterCounts.get(reporterId) || 0) + 1)
+          }
+        })
+
         const realReports = snapshot.docs.map((docSnap, index) => {
           const data = docSnap.data()
-          
-          let panelPriority = 'Normal'
-          let panelPriorityClass = 'normal'
-          
-          if (data.urgency === 'Alta' || data.urgency === 'high') {
-            panelPriority = 'Muito urgente'
-            panelPriorityClass = 'very-urgent'
-          } else if (data.urgency === 'Média' || data.urgency === 'medium') {
-            panelPriority = 'Urgente'
-            panelPriorityClass = 'urgent'
-          }
+          const priority = reportPriorityFromClassification(data)
+          const reporterId = data.userId || data.reporterId
 
           const animal = data.animalType === 'dog' ? 'Cão' : data.animalType === 'cat' ? 'Gato' : data.animalType || 'Animal'
           const title = data.title || `${animal} em perigo`
@@ -900,10 +957,14 @@ function OrganizationDashboard({
             // Garante ID único combinando protocolo e id do doc do Firebase
             id: docSnap.id || data.id || data.protocolNumber || `rep-${index}`,
             title: title,
-            priority: panelPriority,
-            priorityClass: panelPriorityClass,
+            priority: priority.label,
+            priorityClass: priority.className,
             status: normalizeReportStatus(data.status),
             reporter: data.reporterName || data.userName || data.reporter || 'Usuário autenticado',
+            reporterTotalReports:
+              typeof reporterId === 'string' && reporterCounts.has(reporterId)
+                ? reporterCounts.get(reporterId) || 0
+                : Number(data.reporterTotalReports || 0),
             description: data.description || 'Sem descrição detalhada.',
             location: data.locationLabel || data.location || 'Localização via GPS',
             address: data.address || 'Endereço não informado',
@@ -916,6 +977,11 @@ function OrganizationDashboard({
             photoUrl: data.photoUrl,
             hasPhoto: Boolean(data.photoData || data.photoUrl || data.photoFileName),
             createdAt: data.createdAt,
+            assignedOrganizationId: data.assignedOrganizationId,
+            assignedOrganizationName: data.assignedOrganizationName,
+            assignedAt: data.assignedAt,
+            teamMessageCount: Number(data.teamMessageCount || 0),
+            lastMessageAt: data.lastMessageAt,
             triage: {
               immediateRisk: answerLabel(triageAnswers.immediateDanger),
               activeAbuse: answerLabel(triageAnswers.activeAbuse),
@@ -1011,6 +1077,53 @@ function OrganizationDashboard({
     }
   }, [user.uid])
 
+  const reportIdsKey = reports.map((report) => String(report.id)).sort().join('|')
+
+  useEffect(() => {
+    if (!reportIdsKey) {
+      setReportMessages({})
+      return undefined
+    }
+
+    const reportIds = reportIdsKey.split('|').filter(Boolean)
+    const unsubscribers = reportIds.map((reportId) => {
+      const messagesQuery = query(
+        collection(db, 'reports', reportId, 'messages'),
+        orderBy('createdAt', 'asc'),
+      )
+
+      return onSnapshot(
+        messagesQuery,
+        (snapshot) => {
+          const messages = snapshot.docs.map((messageDoc) => {
+            const data = messageDoc.data()
+            const createdAt = data.createdAt?.toDate?.() as Date | undefined
+            const senderRole = data.senderRole === 'team' ? 'team' : 'user'
+            return {
+              id: messageDoc.id,
+              text: String(data.text || ''),
+              mine: senderRole === 'team' && data.senderId === user.uid,
+              timestamp: createdAt
+                ? createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : 'agora',
+              senderId: data.senderId,
+              senderRole,
+              senderName: data.senderName || (senderRole === 'team' ? 'Equipe responsável' : 'Denunciante'),
+              readByUser: data.readByUser === true,
+            } satisfies ChatMessage
+          })
+
+          setReportMessages((current) => ({ ...current, [reportId]: messages }))
+        },
+        (error) => {
+          console.warn(`Não foi possível acompanhar o chat da denúncia ${reportId}.`, error)
+        },
+      )
+    })
+
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
+  }, [reportIdsKey, user.uid])
+
   useEffect(() => {
     localStorage.setItem('weanimals_animals', JSON.stringify(animals))
   }, [animals])
@@ -1056,11 +1169,29 @@ function OrganizationDashboard({
 
   async function handleUpdateReportStatus(reportId: any, status: ReportStatus) {
     let updatedReport: Report | undefined
+    const selected = reports.find((report) => report.id === reportId)
+    const assignment = selected?.assignedOrganizationName
+      ? {}
+      : {
+          assignedOrganizationId: user.uid,
+          assignedOrganizationName: profile.name,
+          assignedAt: serverTimestamp(),
+        }
 
     setReports((current) =>
       current.map((report) => {
         if (report.id === reportId) {
-          updatedReport = { ...report, status, elapsed: 'atualizado agora' }
+          updatedReport = {
+            ...report,
+            status,
+            elapsed: 'atualizado agora',
+            ...(!report.assignedOrganizationName
+              ? {
+                  assignedOrganizationId: user.uid,
+                  assignedOrganizationName: profile.name,
+                }
+              : {}),
+          }
           return updatedReport
         }
         return report
@@ -1073,6 +1204,7 @@ function OrganizationDashboard({
       await updateDoc(reportRef, {
         status: reportStatusStorageValue(status),
         updatedAt: serverTimestamp(),
+        ...assignment,
       })
     } catch (error) {
       console.error('Erro ao atualizar status da denúncia no Firebase:', error)
@@ -1080,37 +1212,50 @@ function OrganizationDashboard({
   }
 
   async function handleSendReportMessage(reportId: any, text: string) {
-    const novaMensagem = {
-      id: `msg-${Date.now()}`,
+    const messageRef = doc(collection(db, 'reports', String(reportId), 'messages'))
+    const novaMensagem: ChatMessage = {
+      id: messageRef.id,
       text,
       mine: true,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      senderId: user.uid,
+      senderRole: 'team',
+      senderName: profile.name,
+      readByUser: false,
     }
 
-    let updatedReport: Report | undefined
-
-    setReports((current) =>
-      current.map((report) => {
-        if (report.id === reportId) {
-          updatedReport = {
-            ...report,
-            chat: [...(report.chat || []), novaMensagem],
-          }
-          return updatedReport
-        }
-        return report
-      }),
-    )
+    setReportMessages((current) => ({
+      ...current,
+      [String(reportId)]: [...(current[String(reportId)] || []), novaMensagem],
+    }))
 
     try {
       const reportRef = doc(db, 'reports', String(reportId))
-      if (updatedReport) {
-        await setDoc(reportRef, updatedReport, { merge: true })
-      } else {
-        await updateDoc(reportRef, { chat: arrayUnion(novaMensagem) })
-      }
+      const batch = writeBatch(db)
+      batch.set(messageRef, {
+        reportId: String(reportId),
+        senderId: user.uid,
+        senderRole: 'team',
+        senderName: profile.name,
+        text,
+        createdAt: serverTimestamp(),
+        readByUser: false,
+      })
+      batch.update(reportRef, {
+        assignedOrganizationId: user.uid,
+        assignedOrganizationName: profile.name,
+        assignedAt: serverTimestamp(),
+        teamMessageCount: increment(1),
+        lastMessageAt: serverTimestamp(),
+      })
+      await batch.commit()
+      pushNotification('Mensagem enviada', `Mensagem enviada ao denunciante da denúncia #${reportId}.`, 'reports', 'info')
     } catch (error) {
       console.error('Erro ao enviar mensagem para o Firebase:', error)
+      setReportMessages((current) => ({
+        ...current,
+        [String(reportId)]: (current[String(reportId)] || []).filter((message) => message.id !== messageRef.id),
+      }))
     }
   }
 
@@ -1346,11 +1491,23 @@ function OrganizationDashboard({
     }
   }
 
+  const reportsForUi = reports.map((report) => {
+    const messages = reportMessages[String(report.id)]
+    const chat = messages?.length ? messages : report.chat ?? []
+    return {
+      ...report,
+      chat,
+      teamMessageCount: messages?.length
+        ? messages.filter((message) => message.senderRole === 'team').length
+        : report.teamMessageCount ?? report.chat?.filter((message) => message.mine).length ?? 0,
+    }
+  })
+
   const selectedReport =
-    reports.find((r) => r.id === selectedReportId) ?? reports[0]
+    reportsForUi.find((r) => r.id === selectedReportId) ?? reportsForUi[0]
 
   const badges = {
-    reports: reports.filter((r) => r.status !== 'Encaminhado a abrigo').length,
+    reports: reportsForUi.filter((r) => r.status !== 'Encaminhado a abrigo').length,
     animals: candidates.filter((c) => c.status === 'pendente').length,
     checkins: checkIns.filter((c) => !c.reviewed).length,
   }
@@ -1376,7 +1533,7 @@ function OrganizationDashboard({
     >
       {section === 'home' && (
         <Home
-          reports={reports}
+          reports={reportsForUi}
           animals={animals}
           candidates={candidates}
           checkIns={checkIns}
@@ -1396,7 +1553,7 @@ function OrganizationDashboard({
       )}
       {section === 'reports' && (
         <Reports
-          reports={reports}
+          reports={reportsForUi}
           reportsError={reportsError}
           selectedReport={selectedReport}
           onSelectReport={setSelectedReportId}

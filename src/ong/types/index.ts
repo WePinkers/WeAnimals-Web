@@ -60,13 +60,17 @@ export type ChatMessage = {
   text: string
   mine: boolean
   timestamp: string
+  senderId?: string
+  senderRole?: 'user' | 'team'
+  senderName?: string
+  readByUser?: boolean
 }
 
 export type Report = {
   id: number
   protocolNumber?: number
   priority: string
-  priorityClass: 'very-urgent' | 'urgent' | 'priority'
+  priorityClass: 'very-urgent' | 'urgent' | 'priority' | 'low'
   title: string
   location: string
   address: string
@@ -87,6 +91,11 @@ export type Report = {
   createdAt?: unknown
   triageClassification?: string
   triageAnswers?: Record<string, boolean>
+  assignedOrganizationId?: string
+  assignedOrganizationName?: string
+  assignedAt?: unknown
+  teamMessageCount?: number
+  lastMessageAt?: unknown
   triage: {
     immediateRisk: string
     activeAbuse: string
