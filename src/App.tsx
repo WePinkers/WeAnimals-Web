@@ -828,7 +828,7 @@ function OrganizationDashboard({
           email: user.email || 'contato@abrigoesperanca.org',
           pixKey: user.email || 'doacoes@abrigoesperanca.org',
           responsibleName: 'Responsável (Pendente)',
-          verifiedAt: '12/03/2025',
+          verifiedAt: new Date().toLocaleDateString('pt-BR'),
           isVerified: true,
         }
   })
@@ -942,6 +942,7 @@ function OrganizationDashboard({
           pixKey: orgData.pixKey ?? prev.pixKey,
           responsibleName: orgData.responsibleName ?? prev.responsibleName,
           isVerified: orgData.isVerified ?? prev.isVerified,
+          verifiedAt: orgData.verifiedAt ?? prev.verifiedAt, 
         }))
       }
     })

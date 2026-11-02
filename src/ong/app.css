@@ -1,9 +1,10 @@
 :root {
-  --p9: #132a20;
-  --p8: #1f3d2e;
-  --p7: #2c5240;
-  --s1: #f3efe4;
-  --s0: #faf8f2;
+  /* Cores padronizadas do Admin */
+  --p9: #132a20; /* Fundo Sidebar */
+  --p8: #1f3d2e; /* Hover/Focus */
+  --p7: #2c5240; /* Destaque principal */
+  --s1: #f3efe4; /* Fundo Geral */
+  --s0: #faf8f2; /* Fundo Cards */
   --c6: #a85c3c;
   --b5: #d9a441;
   --b1: #f3e1b5;
@@ -11,7 +12,20 @@
   --a1: #f3dada;
   --i9: #1c1a16;
   --i6: #5c5548;
-  --ln: #ddd6c4;
+  --ln: #ddd6c4; /* Linhas */
+}
+
+/* =========================================================
+   RESTAURAÇÃO DO TEMA DO LOGIN 
+   ========================================================= */
+.login-brand-panel {
+  background: 
+    radial-gradient(circle at 78% 20%, rgba(191, 112, 72, 0.35), transparent 28%),
+    linear-gradient(145deg, #0c2d24, var(--p9)) !important;
+}
+
+.brand-message h1 {
+  color: #fffaf0 !important;
 }
 
 * {
@@ -420,7 +434,7 @@ button {
   gap: 8px;
   padding: 11px 18px;
   color: #fff;
-  background: var(--c6);
+  background: var(--p7);
   border: 0;
   border-radius: 10px;
   font-size: 13px;
@@ -429,8 +443,9 @@ button {
 }
 
 .brown-button:hover,
-.btn:hover {
-  background: #964f31;
+.btn:hover,
+.primary-button:hover {
+  background: var(--p8);
 }
 
 .btn.g,
@@ -906,51 +921,38 @@ button {
   display: flex;
   width: 100%;
   color: var(--i9);
-  background: var(--s0);
+  background: var(--s1); /* Fundo areia do Admin */
   font-family: Inter, system-ui, sans-serif;
   font-size: 14px;
 }
 
 .portal-sidebar {
-  width: 232px;
+  width: 258px;
   height: 100vh;
   position: sticky;
   top: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   flex-shrink: 0;
-  padding: 22px 14px;
+  padding: 25px 16px 16px;
   color: #fff;
-  background: var(--p9);
+  background: var(--p9); /* Verde escuro do Admin */
 }
 
-.portal-logo,
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 8px 18px;
-  font-family: Fraunces, Georgia, serif;
-  font-size: 19px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.portal-logo-mark,
-.logo i {
-  width: 30px;
-  height: 30px;
-  display: inline-block;
-  background: var(--b5);
-  border-radius: 9px;
-  flex-shrink: 0;
+/* Rótulo de Navegação */
+.nav-label {
+  margin: 27px 9px 12px;
+  color: #91a393;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
 }
 
 .portal-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .portal-nav-button,
@@ -959,60 +961,121 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 12px;
-  color: #cfd8d2;
+  padding: 10px 12px;
+  color: #d6dfd4 !important;
   background: transparent;
-  border: 0;
-  border-radius: 10px;
-  font: 600 13.5px Inter, sans-serif;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font: 600 12px Inter, sans-serif;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s ease;
 }
 
 .portal-nav-button:hover,
 .nav:hover {
-  background: #ffffff14;
+  background: rgba(255, 255, 255, 0.05) !important;
 }
 
 .portal-nav-button.active,
 .nav.on {
-  color: #fff;
-  background: var(--p7);
+  color: #fffdf6 !important;
+  background: var(--p7) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  font-weight: 600;
+}
+
+.nav-icon {
+  display: inline-grid;
+  width: 20px;
+  place-items: center;
+  color: #d6c89f;
+  font-size: 17px;
 }
 
 .portal-nav-button b,
 .nav b {
-  padding: 1px 8px;
+  padding: 2px 6px;
   color: #fff;
-  background: var(--c6);
-  border-radius: 20px;
-  font-size: 11px;
+  background: rgba(255,255,255,0.18) !important;
+  border-radius: 10px;
+  font-size: 9px;
 }
 
-.portal-organization,
-.org {
-  margin-top: auto;
-  padding: 12px;
-  background: #ffffff12;
-  border-radius: 12px;
-  font-size: 13px;
+/* PERFIL NO RODAPÉ ESTILO ADMIN */
+.org-profile-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  margin-top: 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   position: relative;
-  transition: background 0.2s;
 }
 
-.org:hover {
-  background: #ffffff20;
+.org-profile-button:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.portal-organization span,
-.org span {
-  display: block;
-  margin-top: 2px;
-  color: #9fb2a8;
-  font-size: 12px;
+.wa-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--p9);
+  background: #e7d9b6;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
 }
+
+.wa-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wa-admin-profile-info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wa-admin-profile-info strong {
+  font-size: 13px;
+  color: #fffdf6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wa-admin-presence {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.wa-admin-presence-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.wa-admin-presence-dot.online { background: #22c55e; }
+.wa-admin-presence-dot.ausente { background: #f59e0b; }
+.wa-admin-view-profile { text-decoration: underline; text-underline-offset: 2px; color: #94a3b8; }
+.wa-admin-profile-separator { color: #94a3b8; }
 
 .portal-main {
   min-width: 0;
@@ -1023,14 +1086,14 @@ button {
 
 .portal-topbar,
 .top {
-  height: 76px;
+  height: 61px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 18px 32px;
-  background: #fff;
-  border-bottom: 1px solid var(--ln);
+  padding: 12px 35px;
+  background: var(--s0) !important;
+  border-bottom: 1px solid var(--ln) !important;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -1039,11 +1102,12 @@ button {
 .portal-topbar input,
 .top input {
   width: min(300px, 100%);
-  padding: 9px 14px;
+  padding: 10px 14px;
   background: var(--s0);
   border: 1px solid var(--ln);
-  border-radius: 10px;
-  font: 13px Inter, sans-serif;
+  border-radius: 9px;
+  font: 12px Inter, sans-serif;
+  color: var(--i9);
   outline: none;
   transition: border 0.2s, background 0.2s;
 }
@@ -1051,7 +1115,6 @@ button {
 .portal-topbar input:focus,
 .top input:focus {
   border-color: var(--p7);
-  background: #fff;
 }
 
 .notification-button,
@@ -1090,16 +1153,23 @@ button {
 }
 
 .portal-page {
-  padding: 28px 32px 48px;
+  padding: 34px 35px 48px;
   animation: fade 0.25s ease-out;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.portal-page-title, h1, h2, h3 {
+  color: var(--p9) !important;
+  font-family: 'Fraunces', Georgia, serif !important;
+  margin: 0;
 }
 
 .portal-page-title {
-  margin: 0;
-  color: var(--p9);
-  font-family: Fraunces, Georgia, serif;
-  font-size: 26px;
+  font-size: clamp(27px, 3vw, 36px);
   font-weight: 600;
+  letter-spacing: -0.7px;
 }
 
 .portal-page-heading,
@@ -1119,8 +1189,8 @@ button {
   gap: 8px;
   margin: 10px 0 22px;
   padding: 8px 14px;
-  color: var(--p8);
-  background: var(--s1);
+  color: #1f5a33;
+  background: #e8f3eb;
   border-radius: 10px;
   font-size: 12.5px;
   font-weight: 600;
@@ -1156,30 +1226,32 @@ button {
 }
 
 .portal-card,
-.card {
-  padding: 18px;
-  background: #fff;
-  border: 1px solid var(--ln);
-  border-radius: 14px;
+.card,
+.table-card,
+.candidate-card {
+  padding: 20px;
+  background: var(--s0) !important;
+  border: 1px solid var(--ln) !important;
+  border-radius: 12px;
+  box-shadow: none !important;
 }
 
 .portal-card h2,
 .card h2 {
   margin: 0 0 12px;
-  color: var(--p9);
   font-size: 18px;
 }
 
 .portal-card h3,
 .card h3 {
   margin: 6px 0;
-  color: var(--p9);
   font-size: 18px;
 }
 
 .stat-card,
 .stat {
   cursor: pointer;
+  background: var(--s0);
   transition: all 0.2s;
 }
 
@@ -1187,15 +1259,12 @@ button {
 .stat:hover {
   transform: translateY(-2px);
   border-color: var(--p7);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .stat-card strong,
 .stat b {
   display: block;
-  color: var(--p9);
-  font-family: Fraunces, Georgia, serif;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 600;
 }
 
@@ -1212,6 +1281,7 @@ button {
   display: block;
   color: var(--i6);
   font-size: 12px;
+  margin-top: 4px;
 }
 
 .attention-list {
@@ -1699,7 +1769,7 @@ tr.k:hover td {
 }
 
 /* =========================================================
-   MENUS FLUTUANTES (Perfil, Notificações) & TOASTS
+   MENUS FLUTUANTES E MODAIS
    ========================================================= */
 .org-menu {
   position: absolute;
@@ -1787,21 +1857,6 @@ tr.k:hover td {
   color: var(--p9);
 }
 
-.org-item svg {
-  width: 18px;
-  height: 18px;
-  stroke: var(--i6);
-  transition: stroke 0.2s;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.org-item:hover svg {
-  stroke: var(--p9);
-}
-
 .notif-menu {
   position: absolute;
   top: calc(100% + 12px);
@@ -1882,50 +1937,34 @@ tr.k:hover td {
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes pop {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Botão da barrinha (oculto em desktop) */
+/* =========================================================
+   RESPONSIVIDADE (MOBILE)
+   ========================================================= */
 .mobile-menu-toggle {
   display: none;
   background: none;
   border: none;
   cursor: pointer;
   padding: 6px;
-  color: var(--i7, #1e293b);
+  color: var(--p9);
   border-radius: 8px;
   align-items: center;
   justify-content: center;
@@ -1958,7 +1997,6 @@ tr.k:hover td {
     display: flex;
   }
 
-  /* Transforma a sidebar numa gaveta lateral oculta por padrão */
   .portal-sidebar {
     position: fixed;
     top: 0;
@@ -1966,20 +2004,14 @@ tr.k:hover td {
     width: 260px;
     height: 100vh;
     z-index: 10000;
-    background: #0f172a; /* Cor padrão do fundo da sidebar */
     transition: left 0.3s ease;
     box-shadow: 4px 0 20px rgba(0,0,0,0.3);
-    display: flex;
-    flex-direction: column;
-    padding: 20px;
   }
 
-  /* Quando aberto pelo botão da barrinha */
   .portal-sidebar.mobile-open {
     left: 0;
   }
 
-  /* Fundo escuro translúcido ao abrir o menu */
   .mobile-overlay {
     display: block;
     position: fixed;
@@ -1992,9 +2024,6 @@ tr.k:hover td {
   }
 
   .portal-nav {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
     overflow-y: auto;
     flex: 1;
   }
@@ -2007,6 +2036,7 @@ tr.k:hover td {
   .portal-main {
     padding: 16px;
     width: 100%;
+    margin-left: 0;
   }
 
   .portal-grid.g3 {
@@ -2021,19 +2051,4 @@ tr.k:hover td {
   table {
     min-width: 500px;
   }
-}
-
-.portal-sidebar .org span {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.portal-nav .nav.locked {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.portal-nav .nav.locked:hover {
-  background: transparent;
-  color: #94a3b8;
 }

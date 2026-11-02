@@ -42,7 +42,7 @@ export function DashboardLayout({
   const [isNotifMenuOpen, setIsNotifMenuOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  const orgMenuRef = useRef<HTMLDivElement>(null)
+  const orgMenuRef = useRef<HTMLButtonElement>(null)
   const notifMenuRef = useRef<HTMLDivElement>(null)
 
   const initial = (organizationName.trim().charAt(0) || 'O').toUpperCase()
@@ -64,10 +64,12 @@ export function DashboardLayout({
   const NavButton = ({
     section,
     label,
+    icon,
     badgeCount,
   }: {
     section: DashboardSection
     label: string
+    icon: string
     badgeCount?: number
   }) => {
     const isLocked = !isVerified && section !== 'home' && section !== 'profile'
@@ -87,7 +89,10 @@ export function DashboardLayout({
         }}
         style={isLocked ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
       >
-        <span>{label} {isLocked && '🔒'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span className="nav-icon" aria-hidden="true">{icon}</span>
+          <span>{label} {isLocked && '🔒'}</span>
+        </div>
         {badgeCount !== undefined && badgeCount > 0 && !isLocked ? <b>{badgeCount}</b> : null}
       </button>
     )
@@ -100,104 +105,91 @@ export function DashboardLayout({
       )}
 
       <aside className={`portal-sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-        <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        
+        {/* LOGOTIPO */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', marginBottom: '16px' }}>
           <img
             src="/weanimals-entry-silhouette.png"
-            alt="WeAnimals"
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              objectFit: 'contain',
-              padding: '4px',
-              background: '#d4a373',
-              flexShrink: 0,
-            }}
+            alt=""
+            style={{ width: '38px', height: '38px', objectFit: 'contain', flexShrink: 0 }}
           />
-          WeAnimals
-        </div>
-
-        <nav className="portal-nav" aria-label="Navegação do painel">
-          <NavButton section="home" label="Início" />
-          <NavButton section="reports" label="Denúncias" badgeCount={badges.reports} />
-          <NavButton section="community" label="Comunidade" />
-          <NavButton section="animals" label="Animais" badgeCount={badges.animals} />
-          <NavButton section="checkins" label="Check-ins" badgeCount={badges.checkins} />
-        </nav>
-
-        <div
-          className="org"
-          ref={orgMenuRef}
-          onClick={() => setIsOrgMenuOpen(!isOrgMenuOpen)}
-          style={{ display: 'flex', alignItems: 'center', gap: 10 }}
-        >
-          {user.photoURL ? (
-            <img
-              src={user.photoURL}
-              alt={organizationName}
-              style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-            />
-          ) : (
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                background: 'var(--p7)',
-                color: '#fff',
-                display: 'grid',
-                placeItems: 'center',
-                fontWeight: 700,
-                fontSize: 15,
-                flexShrink: 0,
-              }}
-            >
-              {initial}
-            </div>
-          )}
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <b style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {organizationName}
-            </b>
-            <span style={{ color: isVerified ? '#22c55e' : '#eab308' }}>
-              {isVerified ? '✓ Verificada' : '⏳ Pendente de aprovação'}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <strong style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: '21px', fontWeight: 600, color: '#ffffff', lineHeight: 1 }}>
+              WeAnimals
+            </strong>
+            <span style={{ marginTop: '4px', color: '#9fb2a8', fontSize: '9.5px', letterSpacing: '1.2px', fontWeight: 700, textTransform: 'uppercase' }}>
+              Painel Institucional
             </span>
           </div>
+        </div>
 
-          <div
-            className={`org-menu ${isOrgMenuOpen ? 'show' : ''}`}
-            onClick={(e) => e.stopPropagation()}
+        {/* ETIQUETA IGUAL AO DO ADMIN */}
+        <div className="nav-label">GESTÃO DA PLATAFORMA</div>
+
+        {/* MENU COM ÍCONES */}
+        <nav className="portal-nav" aria-label="Navegação do painel">
+          <NavButton section="home" label="Visão geral" icon="◫" />
+          <NavButton section="reports" label="Denúncias" icon="⚑" badgeCount={badges.reports} />
+          <NavButton section="community" label="Comunidade" icon="♙" />
+          <NavButton section="animals" label="Animais" icon="⌂" badgeCount={badges.animals} />
+          <NavButton section="checkins" label="Check-ins" icon="◷" badgeCount={badges.checkins} />
+        </nav>
+
+        {/* RODAPÉ DO PERFIL ESTILO ADMIN */}
+        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b8c6b7', fontSize: '10px', padding: '0 7px' }}>
+            <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#8fc49b' }} />
+            Ambiente Institucional
+          </div>
+
+          <button
+            type="button"
+            className="org-profile-button"
+            ref={orgMenuRef}
+            onClick={() => setIsOrgMenuOpen(!isOrgMenuOpen)}
           >
-            <div className="account-card">
-              <div className="avatar">{initial}</div>
-              <div className="info">
-                <div className="name">{organizationName}</div>
-                <div className="email">{organizationEmail}</div>
+            <div className="wa-avatar">
+              {user.photoURL ? (
+                <img src={user.photoURL} alt={organizationName} />
+              ) : (
+                initial
+              )}
+            </div>
+
+            <div className="wa-admin-profile-info">
+              <strong>{organizationName}</strong>
+              <span className="wa-admin-presence">
+                <span className={`wa-admin-presence-dot ${isVerified ? 'online' : 'ausente'}`} />
+                <span>{isVerified ? 'Verificada' : 'Pendente'}</span>
+                <span className="wa-admin-profile-separator">·</span>
+                <span className="wa-admin-view-profile">Ver perfil</span>
+              </span>
+            </div>
+
+            {/* POPUP MENU DE AÇÕES DA CONTA */}
+            <div
+              className={`org-menu ${isOrgMenuOpen ? 'show' : ''}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="account-card">
+              <div className="avatar" style={{ background: '#2c5240', color: '#ffffff' }}>{initial}</div>
+                <div className="info">
+                  <div className="name" style={{ color: 'var(--pine-900)' }}>{organizationName}</div>
+                  <div className="email">{organizationEmail}</div>
+                </div>
+              </div>
+              <div className="org-item" onClick={() => { setIsOrgMenuOpen(false); onNavigate('profile') }}>
+                Configurações do perfil
+              </div>
+              <div className="org-item" onClick={() => { setIsOrgMenuOpen(false); onLogout() }}>
+                Adicionar outra conta
+              </div>
+              <div style={{ height: 1, background: 'var(--ln)', margin: '4px 0' }} />
+              <div className="org-item" style={{ color: 'var(--a6)' }} onClick={onLogout}>
+                Sair
               </div>
             </div>
-            <div
-              className="org-item"
-              onClick={() => {
-                setIsOrgMenuOpen(false)
-                onNavigate('profile')
-              }}
-            >
-              Configurações do perfil
-            </div>
-            <div
-              className="org-item"
-              onClick={() => {
-                setIsOrgMenuOpen(false)
-                onLogout()
-              }}
-            >
-              Adicionar outra conta
-            </div>
-            <div style={{ height: 1, background: 'var(--ln)', margin: '4px 0' }} />
-            <div className="org-item" style={{ color: 'var(--a6)' }} onClick={onLogout}>
-              Sair
-            </div>
-          </div>
+          </button>
         </div>
       </aside>
 

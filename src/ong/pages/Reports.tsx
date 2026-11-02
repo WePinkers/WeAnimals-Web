@@ -251,18 +251,23 @@ export function Reports({
               </button>
             </div>
 
-            {showDetails && selectedReport.triage && (
-              <div className="detail-box">
-                <strong>Respostas da triagem</strong>
-                <p>
-                  Risco imediato de morte: {selectedReport.triage.immediateRisk} ·
-                  Maus-tratos ativos: {selectedReport.triage.activeAbuse} · Animal
-                  preso ou ferido: {selectedReport.triage.trappedOrInjured} · Situação
-                  de rua sem risco: {selectedReport.triage.streetNoRisk}
+            {showDetails && (
+              <div className="detail-box" style={{ marginTop: '16px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b' }}>Descrição e Triagem da Ocorrência</strong>
+                <p style={{ margin: '0 0 8px 0', color: '#334155', fontSize: '13.5px' }}>
+                  <strong>Descrição:</strong> {(selectedReport as any).description || 'Nenhuma descrição detalhada informada.'}
                 </p>
-                <p>
-                  Foto: {selectedReport.triage.photoName} · {selectedReport.address}
-                </p>
+                {selectedReport.triage ? (
+                  <p style={{ margin: 0, color: '#475569', fontSize: '13px', lineHeight: '1.5' }}>
+                    Risco imediato: {selectedReport.triage.immediateRisk || 'Não'} · 
+                    Maus-tratos ativos: {selectedReport.triage.activeAbuse || 'Sim'} · 
+                    Preso ou ferido: {selectedReport.triage.trappedOrInjured || 'Sim'}
+                  </p>
+                ) : (
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>
+                    Endereço completo: {selectedReport.address}
+                  </p>
+                )}
               </div>
             )}
 
