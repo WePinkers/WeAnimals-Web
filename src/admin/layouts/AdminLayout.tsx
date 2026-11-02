@@ -53,7 +53,13 @@ export default function AdminLayout({
     <div className="wa-shell">
       <aside className="wa-sidebar">
         <div className="wa-brand">
-          <div className="wa-brand-mark">W</div>
+          <div className="wa-brand-mark" style={{ background: 'transparent', padding: 0 }}>
+          <img 
+            src="/weanimals-entry-silhouette.png" 
+            alt="Logo WeAnimals" 
+            style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+          />
+        </div>
 
           <div>
             <strong>WeAnimals</strong>

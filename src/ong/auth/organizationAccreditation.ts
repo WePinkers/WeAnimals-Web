@@ -8,17 +8,29 @@ export function isOrganizationAuthMutationInProgress() {
   return authMutationInProgress
 }
 
+type OngDocument = {
+  name: string;
+  sizeBytes: number;
+  contentType: string;
+  url?: string;
+}
+
 export async function submitOrganizationAccreditation(data: {
   cnpj: string
   legalName: string
   responsibleName: string
   institutionalEmail: string
   password: string
-  documentName: string
-  documentSizeBytes: number
-  documentContentType: string
   pixKey: string
-}) {
+  documents: {
+    comprovanteCnpj: OngDocument;
+    estatutoSocial: OngDocument;
+    ataEleicao: OngDocument;
+    certidaoDebitos: OngDocument;
+    dividaAtivaUniao: OngDocument;
+    comprovanteEndereco: OngDocument;
+  }
+  }) {
   authMutationInProgress = true
 
   try {
@@ -38,6 +50,7 @@ export async function submitOrganizationAccreditation(data: {
       responsibleName: data.responsibleName,
       verifiedAt: 'Aguardando moderação',
       isVerified: false,
+      documents: data.documents,
     })
 
     // Salva o mapeamento de CNPJ para E-mail
