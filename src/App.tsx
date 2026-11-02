@@ -13,7 +13,10 @@ import {
   setDoc,
   updateDoc, 
   deleteDoc, 
-  arrayUnion 
+  arrayUnion,
+  query,
+  where,
+  serverTimestamp,
 } from 'firebase/firestore'
 import './ong/app.css'
 import AdminApp from './admin/AdminApp'
@@ -28,6 +31,7 @@ import {
   submitOrganizationAccreditation,
 } from './ong/auth/organizationAccreditation'
 import { hasAdminAccess } from './admin/adminAccess'
+import { normalizeReportStatus, reportStatusStorageValue } from './ong/types'
 
 import { DashboardLayout } from './ong/layouts/DashboardLayout'
 import { Home } from './ong/pages/Home'
@@ -157,6 +161,10 @@ function AdminRoute() {
     let active = true
 
     return onAuthStateChanged(auth, (nextUser) => {
+      if (nextUser?.isAnonymous) {
+        void signOut(auth).catch(() => undefined)
+      }
+
       if (!nextUser || nextUser.isAnonymous) {
         if (active) {
           setAllowed(false)
@@ -221,6 +229,10 @@ function OrganizationPortalApp() {
         isOrganizationLoginMutationInProgress()
       ) {
         return
+      }
+
+      if (nextUser?.isAnonymous) {
+        void signOut(auth).catch(() => undefined)
       }
 
       if (!nextUser || nextUser.isAnonymous) {
@@ -790,11 +802,11 @@ function OrganizationDashboard({
   const [section, setSection] = useState<DashboardSection>('home')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const [reports, setReports] = useState<Report[]>(() => {
-    const saved = localStorage.getItem('weanimals_reports')
-    return saved ? JSON.parse(saved) : initialReports
-  })
-  const [selectedReportId, setSelectedReportId] = useState<any>(() => reports[0]?.id ?? 4468)
+  const [reports, setReports] = useState<Report[]>([])
+  const [reportsError, setReportsError] = useState<string | null>(null)
+  const [selectedReportId, setSelectedReportId] = useState<any>(
+    () => reports[0]?.id ?? initialReports[0]?.id ?? 4468,
+  )
 
   const [animals, setAnimals] = useState<AnimalItem[]>(() => {
     const saved = localStorage.getItem('weanimals_animals')
@@ -846,7 +858,22 @@ function OrganizationDashboard({
   ])
 
   useEffect(() => {
-    const unsubscribeReports = onSnapshot(collection(db, 'reports'), (snapshot) => {
+    const currentAuthUser = auth.currentUser
+    if (
+      user.isAnonymous ||
+      !currentAuthUser ||
+      currentAuthUser.isAnonymous ||
+      currentAuthUser.uid !== user.uid
+    ) {
+      return undefined
+    }
+
+    const authenticatedReportsQuery = query(
+      collection(db, 'reports'),
+      where('reporterIsAnonymous', '==', false),
+    )
+    const unsubscribeReports = onSnapshot(authenticatedReportsQuery, (snapshot) => {
+      setReportsError(null)
       if (!snapshot.empty) {
         const realReports = snapshot.docs.map((docSnap, index) => {
           const data = docSnap.data()
@@ -864,6 +891,9 @@ function OrganizationDashboard({
 
           const animal = data.animalType === 'dog' ? 'Cão' : data.animalType === 'cat' ? 'Gato' : data.animalType || 'Animal'
           const title = data.title || `${animal} em perigo`
+          const triageAnswers = (data.triageAnswers || {}) as Record<string, boolean>
+          const answerLabel = (value: unknown) =>
+            value === true ? 'Sim' : value === false ? 'Não' : 'Não respondido'
 
           return {
             ...data,
@@ -872,11 +902,27 @@ function OrganizationDashboard({
             title: title,
             priority: panelPriority,
             priorityClass: panelPriorityClass,
-            status: data.status || 'novo',
-            reporter: data.userName || data.reporter || 'Cidadão Anônimo',
+            status: normalizeReportStatus(data.status),
+            reporter: data.reporterName || data.userName || data.reporter || 'Usuário autenticado',
             description: data.description || 'Sem descrição detalhada.',
             location: data.locationLabel || data.location || 'Localização via GPS',
             address: data.address || 'Endereço não informado',
+            animalType: data.animalType || 'other',
+            urgency: data.urgency || 'medium',
+            triageClassification: data.triageClassification || '',
+            triageAnswers,
+            photoData: data.photoData,
+            photoFileName: data.photoFileName,
+            photoUrl: data.photoUrl,
+            hasPhoto: Boolean(data.photoData || data.photoUrl || data.photoFileName),
+            createdAt: data.createdAt,
+            triage: {
+              immediateRisk: answerLabel(triageAnswers.immediateDanger),
+              activeAbuse: answerLabel(triageAnswers.activeAbuse),
+              trappedOrInjured: answerLabel(triageAnswers.injuredOrImmobilized),
+              streetNoRisk: answerLabel(triageAnswers.streetSituation),
+              photoName: data.photoFileName || '',
+            },
             coordinates: { 
               lat: data.latitude || -23.5505,
               lng: data.longitude || -46.6333 
@@ -889,6 +935,14 @@ function OrganizationDashboard({
       } else {
         setReports([])
       }
+    }, (error) => {
+      console.error('Erro ao carregar denúncias autenticadas:', error)
+      setReports([])
+      setReportsError(
+        error.code === 'permission-denied'
+          ? 'A conta da ONG ainda não tem permissão para consultar as denúncias.'
+          : 'Não foi possível carregar as denúncias agora.',
+      )
     })
 
     const unsubscribeAnimals = onSnapshot(collection(db, 'animals'), (snapshot) => {
@@ -958,10 +1012,6 @@ function OrganizationDashboard({
   }, [user.uid])
 
   useEffect(() => {
-    localStorage.setItem('weanimals_reports', JSON.stringify(reports))
-  }, [reports])
-
-  useEffect(() => {
     localStorage.setItem('weanimals_animals', JSON.stringify(animals))
   }, [animals])
 
@@ -1020,11 +1070,10 @@ function OrganizationDashboard({
 
     try {
       const reportRef = doc(db, 'reports', String(reportId))
-      if (updatedReport) {
-        await setDoc(reportRef, updatedReport, { merge: true })
-      } else {
-        await setDoc(reportRef, { status, elapsed: 'atualizado agora' }, { merge: true })
-      }
+      await updateDoc(reportRef, {
+        status: reportStatusStorageValue(status),
+        updatedAt: serverTimestamp(),
+      })
     } catch (error) {
       console.error('Erro ao atualizar status da denúncia no Firebase:', error)
     }
@@ -1348,6 +1397,7 @@ function OrganizationDashboard({
       {section === 'reports' && (
         <Reports
           reports={reports}
+          reportsError={reportsError}
           selectedReport={selectedReport}
           onSelectReport={setSelectedReportId}
           onUpdateStatus={handleUpdateReportStatus}

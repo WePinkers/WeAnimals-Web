@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Report, ReportStatus } from '../types'
 import { useToast } from '../components/ToastContext'
 
 interface ReportsProps {
   reports: Report[]
+  reportsError?: string | null
   selectedReport: Report
   onSelectReport: (id: any) => void
   onUpdateStatus: (reportId: any, status: ReportStatus) => void
@@ -17,8 +18,78 @@ const statusMap: { label: string; value: ReportStatus }[] = [
   { label: 'Encaminhado a abrigo', value: 'Encaminhado a abrigo' },
 ]
 
+const triageQuestions = [
+  ['immediateDanger', 'Há risco imediato de morte?'],
+  ['activeAbuse', 'Há maus-tratos ativos?'],
+  ['injuredOrImmobilized', 'O animal está preso, ferido ou imobilizado?'],
+  ['streetSituation', 'É uma situação de rua sem risco iminente?'],
+] as const
+
+function answerLabel(value: unknown) {
+  if (value === true) return 'Sim'
+  if (value === false) return 'Não'
+  return 'Não respondido'
+}
+
+function animalLabel(animalType?: string) {
+  if (animalType === 'cat') return 'Gato'
+  if (animalType === 'dog') return 'Cão'
+  return 'Outro animal'
+}
+
+function urgencyLabel(urgency?: string) {
+  if (urgency === 'high' || urgency === 'Alta') return 'Alta'
+  if (urgency === 'low' || urgency === 'Baixa') return 'Baixa'
+  return 'Média'
+}
+
+function classificationInfo(value?: string) {
+  switch (value) {
+    case 'very_urgent':
+      return {
+        label: 'Muito urgente',
+        response: 'atendimento em até 15 minutos',
+        description: 'Maus-tratos ativos e animal ferido detectados.',
+      }
+    case 'urgent':
+      return {
+        label: 'Urgente',
+        response: 'atendimento em até 1 hora',
+        description: 'Há sinais relevantes de risco para avaliação prioritária.',
+      }
+    case 'priority':
+      return {
+        label: 'Prioridade',
+        response: 'atendimento ainda hoje',
+        description: 'O caso precisa de atendimento, sem risco imediato identificado.',
+      }
+    case 'low':
+      return {
+        label: 'Baixa urgência',
+        response: 'atendimento conforme disponibilidade',
+        description: 'Caso registrado para acompanhamento e encaminhamento adequado.',
+      }
+    default:
+      return null
+  }
+}
+
+function formatReportDate(value: unknown) {
+  if (!value) return 'Data não informada'
+  try {
+    const date = typeof value === 'object' && value !== null && 'toDate' in value
+      ? (value as { toDate: () => Date }).toDate()
+      : new Date(value as string | number | Date)
+    if (Number.isNaN(date.getTime())) return 'Data não informada'
+    return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return 'Data não informada'
+  }
+}
+
 export function Reports({
   reports,
+  reportsError,
   selectedReport,
   onSelectReport,
   onUpdateStatus,
@@ -29,6 +100,27 @@ export function Reports({
   const [showDetails, setShowDetails] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [messageInput, setMessageInput] = useState('')
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const photoData = selectedReport?.photoData as { toBase64?: () => string } | undefined
+    const externalPhotoUrl = selectedReport?.photoUrl
+
+    try {
+      const base64 = photoData?.toBase64?.()
+      const nextUrl = base64
+        ? `data:image/jpeg;base64,${base64}`
+        : externalPhotoUrl || null
+      if (!cancelled) setPhotoPreviewUrl(nextUrl)
+    } catch {
+      if (!cancelled) setPhotoPreviewUrl(externalPhotoUrl || null)
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedReport])
 
   const filteredReports = reports.filter((report) => {
     if (filter === 'active') return report.status !== 'Encaminhado a abrigo'
@@ -109,7 +201,12 @@ export function Reports({
 
       <div className="reports-layout">
         <div className="report-list">
-          {filteredReports.length ? (
+          {reportsError ? (
+            <div className="empty-panel">
+              <strong>{reportsError}</strong>
+              <span>Confirme se a conta da ONG está aprovada no Firebase.</span>
+            </div>
+          ) : filteredReports.length ? (
             filteredReports.map((report, index) => {
               const displayNumber = (report as any).protocolNumber || String(index + 1).padStart(2, '0')
               return (
@@ -252,21 +349,105 @@ export function Reports({
             </div>
 
             {showDetails && (
-              <div className="detail-box" style={{ marginTop: '16px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b' }}>Descrição e Triagem da Ocorrência</strong>
-                <p style={{ margin: '0 0 8px 0', color: '#334155', fontSize: '13.5px' }}>
-                  <strong>Descrição:</strong> {(selectedReport as any).description || 'Nenhuma descrição detalhada informada.'}
-                </p>
-                {selectedReport.triage ? (
-                  <p style={{ margin: 0, color: '#475569', fontSize: '13px', lineHeight: '1.5' }}>
-                    Risco imediato: {selectedReport.triage.immediateRisk || 'Não'} · 
-                    Maus-tratos ativos: {selectedReport.triage.activeAbuse || 'Sim'} · 
-                    Preso ou ferido: {selectedReport.triage.trappedOrInjured || 'Sim'}
+              <div
+                className="detail-box"
+                style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  background: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  display: 'grid',
+                  gap: '16px',
+                }}
+              >
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b' }}>
+                    Informações da denúncia
+                  </strong>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
+                    <InfoItem label="Animal" value={animalLabel(selectedReport.animalType)} />
+                    <InfoItem label="Urgência informada" value={urgencyLabel(selectedReport.urgency)} />
+                    <InfoItem label="Enviada em" value={formatReportDate(selectedReport.createdAt)} />
+                  </div>
+                </div>
+
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b' }}>
+                    Foto enviada
+                  </strong>
+                  {photoPreviewUrl ? (
+                    <img
+                      src={photoPreviewUrl}
+                      alt="Foto enviada na denúncia"
+                      style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, display: 'block' }}
+                    />
+                  ) : (
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>
+                      {selectedReport.hasPhoto
+                        ? selectedReport.photoFileName || 'Foto enviada'
+                        : 'Nenhuma foto enviada'}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b' }}>
+                    Descrição da ocorrência
+                  </strong>
+                  <p style={{ margin: 0, color: '#334155', fontSize: '13.5px', lineHeight: 1.5 }}>
+                    {selectedReport.description || 'Nenhuma descrição detalhada informada.'}
                   </p>
-                ) : (
-                  <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>
-                    Endereço completo: {selectedReport.address}
+                </div>
+
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b' }}>
+                    Localização informada
+                  </strong>
+                  <p style={{ margin: 0, color: '#334155', fontSize: '13.5px', lineHeight: 1.5 }}>
+                    {selectedReport.address || 'Endereço não informado'}
                   </p>
+                  {selectedReport.coordinates && (
+                    <small style={{ display: 'block', marginTop: 4, color: '#64748b' }}>
+                      GPS: {selectedReport.coordinates.lat.toFixed(6)}, {selectedReport.coordinates.lng.toFixed(6)}
+                    </small>
+                  )}
+                </div>
+
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b' }}>
+                    Respostas da triagem
+                  </strong>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {triageQuestions.map(([key, question]) => (
+                      <div
+                        key={key}
+                        style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#475569', fontSize: 13 }}
+                      >
+                        <span>{question}</span>
+                        <b style={{ color: selectedReport.triageAnswers?.[key] === true ? '#b45309' : '#334155', whiteSpace: 'nowrap' }}>
+                          {answerLabel(selectedReport.triageAnswers?.[key])}
+                        </b>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {classificationInfo(selectedReport.triageClassification) && (
+                  <div style={{ padding: '12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8 }}>
+                    <strong style={{ display: 'block', color: '#9a3412', textTransform: 'uppercase', fontSize: 11, letterSpacing: '.08em' }}>
+                      Classificação calculada
+                    </strong>
+                    <b style={{ display: 'block', marginTop: 4, color: '#1e293b' }}>
+                      {classificationInfo(selectedReport.triageClassification)?.label}
+                    </b>
+                    <span style={{ display: 'block', marginTop: 2, color: '#475569', fontSize: 13 }}>
+                      {classificationInfo(selectedReport.triageClassification)?.response}
+                    </span>
+                    <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 12.5 }}>
+                      {classificationInfo(selectedReport.triageClassification)?.description}
+                    </p>
+                  </div>
                 )}
               </div>
             )}
@@ -326,5 +507,14 @@ export function Reports({
         )}
       </div>
     </section>
+  )
+}
+
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 7 }}>
+      <small style={{ display: 'block', color: '#64748b', fontSize: 11 }}>{label}</small>
+      <b style={{ display: 'block', marginTop: 2, color: '#334155', fontSize: 12.5 }}>{value}</b>
+    </div>
   )
 }

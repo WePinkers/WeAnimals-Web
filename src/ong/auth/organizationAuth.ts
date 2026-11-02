@@ -65,8 +65,9 @@ export async function signInOrganization(
 
     // NOVO: Se o identificador não tiver '@', assume que é um CNPJ
     const cleanCnpj = trimmed.replace(/\D/g, '')
-    const isTemporaryAccess =
-      import.meta.env.DEV && cleanCnpj === TEMPORARY_CNPJ
+    // A conta fake de teste precisa funcionar tanto no Vite local quanto no
+    // build publicado que usamos para a demonstração.
+    const isTemporaryAccess = cleanCnpj === TEMPORARY_CNPJ
 
     if (!trimmed.includes('@') && !isTemporaryAccess) {
       const cleanCnpj = trimmed.replace(/\D/g, '')

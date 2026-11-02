@@ -22,6 +22,39 @@ export type ReportStatus =
   | 'Resgate'
   | 'Encaminhado a abrigo'
 
+export function normalizeReportStatus(status: unknown): ReportStatus {
+  switch (status) {
+    case 'Equipe acionada':
+    case 'new':
+    case 'under_review':
+      return 'Equipe acionada'
+    case 'Equipe a caminho':
+    case 'in_progress':
+      return 'Equipe a caminho'
+    case 'Resgate':
+    case 'rescued':
+      return 'Resgate'
+    case 'Encaminhado a abrigo':
+    case 'closed':
+      return 'Encaminhado a abrigo'
+    default:
+      return 'Equipe acionada'
+  }
+}
+
+export function reportStatusStorageValue(status: unknown): string {
+  switch (normalizeReportStatus(status)) {
+    case 'Equipe acionada':
+      return 'under_review'
+    case 'Equipe a caminho':
+      return 'in_progress'
+    case 'Resgate':
+      return 'rescued'
+    case 'Encaminhado a abrigo':
+      return 'closed'
+  }
+}
+
 export type ChatMessage = {
   id: string
   text: string
@@ -31,18 +64,29 @@ export type ChatMessage = {
 
 export type Report = {
   id: number
+  protocolNumber?: number
   priority: string
   priorityClass: 'very-urgent' | 'urgent' | 'priority'
   title: string
   location: string
   address: string
   coordinates?: { lat: number; lng: number }
+  animalType?: string
+  urgency?: string
   status: ReportStatus
   reporter: string
   reporterSince: string
   reporterTotalReports: number
   reporterReliability: number
   elapsed: string
+  description?: string
+  photoData?: unknown
+  photoFileName?: string
+  photoUrl?: string
+  hasPhoto?: boolean
+  createdAt?: unknown
+  triageClassification?: string
+  triageAnswers?: Record<string, boolean>
   triage: {
     immediateRisk: string
     activeAbuse: string

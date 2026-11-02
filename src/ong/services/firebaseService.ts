@@ -4,13 +4,19 @@ import {
   updateDoc, 
   doc, 
   onSnapshot,
-  query 
+  query,
+  where,
+  serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../../firebase'
+import { reportStatusStorageValue } from '../types'
 import type { Report, AnimalItem } from '../types'
 
 export function subscribeToReports(callback: (reports: Report[]) => void) {
-  const q = query(collection(db, 'reports'))
+  const q = query(
+    collection(db, 'reports'),
+    where('reporterIsAnonymous', '==', false),
+  )
   return onSnapshot(q, (snapshot) => {
     const reportsList = snapshot.docs.map((document) => ({
       id: Number(document.id) || document.data().id,
@@ -20,12 +26,12 @@ export function subscribeToReports(callback: (reports: Report[]) => void) {
   })
 }
 
-export async function updateReportStatusInFirestore(reportId: number, newStatus: string) {
+export async function updateReportStatusInFirestore(reportId: string | number, newStatus: string) {
   try {
     const reportDocRef = doc(db, 'reports', String(reportId))
     await updateDoc(reportDocRef, {
-      status: newStatus,
-      elapsed: 'atualizado agora'
+      status: reportStatusStorageValue(newStatus),
+      updatedAt: serverTimestamp(),
     })
   } catch (error) {
     console.error('Erro ao atualizar denúncia no Firestore:', error)
