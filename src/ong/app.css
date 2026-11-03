@@ -680,7 +680,7 @@ button {
 .legal-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 200;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -1736,6 +1736,131 @@ tr.k:hover td {
 .portal-page textarea {
   min-height: 80px;
   resize: vertical;
+}
+
+/* Editor da Comunidade: segue a linguagem visual dos cards de Animais. */
+.community-editor,
+.community-dialog {
+  width: min(100%, 760px);
+  max-height: min(86vh, 820px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--i9);
+  background: var(--s0);
+  border: 1px solid var(--ln);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(19, 42, 32, 0.28);
+}
+
+.community-dialog { padding: 26px; }
+
+.community-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 26px 28px 18px;
+  border-bottom: 1px solid var(--ln);
+}
+
+.community-editor h2,
+.community-dialog h2 { margin: 4px 0 0; font-size: 27px; }
+
+.community-close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--i6);
+  background: var(--s1);
+  border: 1px solid var(--ln);
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.community-editor-scroll { overflow-y: auto; padding: 20px 28px 8px; }
+.community-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.community-form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.community-field { display: grid; gap: 7px; margin: 0 0 16px; }
+.community-field > span,
+.community-field > .mono {
+  color: var(--i6);
+  font: 700 11px 'IBM Plex Mono', monospace;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+}
+
+.community-editor input,
+.community-editor textarea,
+.community-dialog input {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--i9);
+  background: #fff;
+  border: 1px solid var(--ln);
+  border-radius: 11px;
+  font: 14px Inter, sans-serif;
+  outline: none;
+}
+
+.community-editor textarea { min-height: 104px; }
+.community-editor input:focus,
+.community-editor textarea:focus,
+.community-dialog input:focus { border-color: var(--p7); box-shadow: 0 0 0 3px rgba(44, 82, 64, .1); }
+.community-editor .chips { gap: 8px; margin: 0; }
+.community-editor .chip { min-height: 40px; padding: 8px 16px; }
+
+.community-checkboxes,
+.community-animal-options { display: grid; gap: 8px; }
+.community-checkboxes label,
+.community-animal-options label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 10px 12px;
+  background: var(--s1);
+  border: 1px solid var(--ln);
+  border-radius: 10px;
+  font-weight: 600;
+}
+.community-checkboxes input,
+.community-animal-options input { width: auto; min-height: 0; margin: 0; accent-color: var(--p7); }
+
+.community-photo-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.community-photo-add {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px 16px;
+  color: var(--p8);
+  background: var(--s0);
+  border: 1.5px dashed var(--ln);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.community-photo-add input { display: none; }
+.community-photo-preview { position: relative; width: 64px; height: 64px; overflow: hidden; border: 1px solid var(--ln); border-radius: 10px; }
+.community-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.community-photo-preview button { position: absolute; top: 3px; right: 3px; width: 21px; height: 21px; color: #fff; background: rgba(0,0,0,.65); border: 0; border-radius: 50%; line-height: 1; }
+
+.community-editor-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 18px 28px 24px; border-top: 1px solid var(--ln); }
+.community-list { display: grid; gap: 8px; max-height: 290px; overflow-y: auto; margin: 16px 0; }
+.community-divider { height: 1px; margin: 16px 0; background: var(--ln); }
+.community-inline-input { display: flex; gap: 8px; margin-top: 16px; }
+.community-card-image { width: 100%; height: 156px; margin-bottom: 12px; object-fit: cover; border-radius: 10px; }
+
+@media (max-width: 640px) {
+  .community-editor-header, .community-editor-scroll { padding-left: 18px; padding-right: 18px; }
+  .community-editor-actions { padding: 16px 18px; }
+  .community-form-grid, .community-form-grid.three { grid-template-columns: 1fr; }
+  .community-dialog { width: calc(100vw - 28px); padding: 20px; }
 }
 
 .answer-row,

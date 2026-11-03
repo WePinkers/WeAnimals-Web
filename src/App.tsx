@@ -54,6 +54,7 @@ import type {
   Candidate,
   CandidateStatus,
   CommunityPost,
+  CommunityPostInput,
   CheckInRecord,
   OrganizationProfile,
 } from './ong/types'
@@ -97,6 +98,17 @@ const initialAnimals: AnimalItem[] = [
     traits: ['Vacinada', 'Castrada', 'Dócil'],
     requirements: ['Maior de 18 anos', 'Visita prévia'],
     photos: [],
+    species: 'Cão',
+    sex: 'Fêmea',
+    breed: 'SRD',
+    estimatedAge: '2 anos',
+    status: 'Disponível',
+    story: 'Canela é dócil e está pronta para encontrar uma família.',
+    health: ['Vacinada', 'Castrada', 'Vermifugada'],
+    compatibility: ['Boa com crianças', 'Boa com outros cães'],
+    energyLevel: 'Moderada',
+    idealHome: 'Casa com quintal ou família com passeios regulares',
+    location: 'Vila Marlene',
   },
 ]
 
@@ -125,10 +137,20 @@ const initialPosts: CommunityPost[] = [
     type: 'Campanha',
     categoryLabel: 'Castração',
     title: 'Mutirão de sábado',
-    description: 'Sáb, 6 set · 8h–13h · Vila Marlene',
+    description: 'Castração gratuita para cães e gatos de moradores da região.',
     progressText: '28 de 60 vagas',
     progressPct: 47,
     subscribers: [],
+    campaign: {
+      startsAt: '2026-09-06T08:00',
+      endsAt: '2026-09-06T13:00',
+      location: {
+        name: 'Sede do abrigo',
+        address: 'Vila Marlene',
+      },
+      animalAudience: 'Cães e gatos, a partir de 4 meses',
+      capacity: 60,
+    },
   },
 ]
 
@@ -145,6 +167,13 @@ const initialCheckIns: CheckInRecord[] = [
       90: [{ label: 'Adaptação (90d)', value: 'Ótima' }],
       180: [{ label: 'Status (180d)', value: 'Ainda dentro do prazo' }],
     },
+    animalId: 'ani-1',
+    adoptionDate: '2026-06-28',
+    timeline: [
+      { period: 30, dueDate: '2026-07-28', status: 'revisado' },
+      { period: 90, dueDate: '2026-09-26', status: 'disponível' },
+      { period: 180, dueDate: '2026-12-25', status: 'agendado' },
+    ],
   },
 ]
 
@@ -1277,6 +1306,7 @@ function OrganizationDashboard({
   async function handleUpdateCandidateStatus(candidateId: string, status: CandidateStatus, justificationText?: string) {
     let updatedCandidate: Candidate | undefined
     let generatedCheckIn: CheckInRecord | undefined
+    let adoptedAnimal: AnimalItem | undefined
 
     setCandidates((prev) =>
       prev.map((c) => {
@@ -1288,18 +1318,35 @@ function OrganizationDashboard({
           }
           if (status === 'aprovado') {
             const animalObj = animals.find((a) => a.id === c.animalId)
+            const adoptionDate = new Date().toISOString().slice(0, 10)
+            const dueDate = (days: number) => {
+              const date = new Date()
+              date.setDate(date.getDate() + days)
+              return date.toISOString().slice(0, 10)
+            }
+            if (animalObj) {
+              adoptedAnimal = { ...animalObj, status: 'Adotado', adoptedAt: adoptionDate }
+            }
             generatedCheckIn = {
               id: `chk-${Date.now()}`,
               animal: animalObj ? animalObj.name : 'Pet',
               adopter: c.name,
               currentDays: 30,
-              status: 'Ótima',
+              status: 'Não respondido',
               reviewed: false,
               reportsByPeriod: {
-                30: [{ label: 'Adaptação inicial (30d)', value: 'Adoção recém-aprovada' }],
-                90: [{ label: 'Status (90d)', value: 'Aguardando prazo' }],
-                180: [{ label: 'Status (180d)', value: 'Aguardando prazo' }],
+                30: [],
+                90: [],
+                180: [],
               },
+              animalId: c.animalId,
+              animalPhoto: animalObj?.photos?.[0],
+              adoptionDate,
+              timeline: [
+                { period: 30, dueDate: dueDate(30), status: 'agendado' },
+                { period: 90, dueDate: dueDate(90), status: 'agendado' },
+                { period: 180, dueDate: dueDate(180), status: 'agendado' },
+              ],
             }
           }
           return updatedCandidate
@@ -1313,6 +1360,10 @@ function OrganizationDashboard({
       setCheckIns((chkPrev) => [checkInToSave, ...chkPrev])
       pushNotification('Adoção Aprovada!', `Check-in de 30 dias gerado para ${checkInToSave.adopter}.`, 'checkins', 'checkin')
     }
+    if (adoptedAnimal) {
+      const animalToSave = adoptedAnimal
+      setAnimals((prev) => prev.map((animal) => animal.id === animalToSave.id ? animalToSave : animal))
+    }
 
     try {
       if (updatedCandidate) {
@@ -1321,12 +1372,15 @@ function OrganizationDashboard({
       if (generatedCheckIn) {
         await setDoc(doc(db, 'checkins', generatedCheckIn.id), generatedCheckIn)
       }
+      if (adoptedAnimal) {
+        await setDoc(doc(db, 'animals', adoptedAnimal.id), adoptedAnimal, { merge: true })
+      }
     } catch (error) {
       console.error('Erro ao atualizar candidato no Firebase:', error)
     }
   }
 
-  async function handleSaveCommunityPost(postData: any) {
+  async function handleSaveCommunityPost(postData: CommunityPostInput) {
     if (postData.id) {
       let updatedPost: CommunityPost | undefined
       setPosts((prev) =>
@@ -1339,6 +1393,13 @@ function OrganizationDashboard({
               categoryLabel: postData.categoryLabel,
               description: postData.description,
               progressText: postData.progressText,
+              progressPct: postData.progressPct,
+              campaign: postData.campaign,
+              postCategory: postData.postCategory,
+              imageUrl: postData.imageUrl,
+              imageUrls: postData.imageUrls,
+              location: postData.location,
+              postDetails: postData.postDetails,
             }
             return updatedPost
           }
@@ -1362,11 +1423,17 @@ function OrganizationDashboard({
         title: postData.title,
         description: postData.description,
         progressText: postData.progressText,
-        progressPct: 10,
+        progressPct: postData.progressPct ?? 0,
         subscribers: [],
         likes: 0,
         commentsList: [],
         elapsed: 'agora',
+        campaign: postData.campaign,
+        postCategory: postData.postCategory,
+        imageUrl: postData.imageUrl,
+        imageUrls: postData.imageUrls,
+        location: postData.location,
+        postDetails: postData.postDetails,
       }
       setPosts((prev) => [newPost, ...prev])
       pushNotification('Nova Campanha', `"${postData.title}" foi publicada na comunidade.`, 'community', 'info')
@@ -1452,9 +1519,18 @@ function OrganizationDashboard({
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === postId) {
+          const subscribers = [...(p.subscribers ?? []), newSub]
+          const capacity = p.campaign?.capacity
+          const hasCapacity = typeof capacity === 'number' && capacity > 0
           updatedPost = {
             ...p,
-            subscribers: [...(p.subscribers ?? []), newSub],
+            subscribers,
+            progressText: hasCapacity
+              ? `${subscribers.length} de ${capacity} vagas preenchidas`
+              : p.progressText,
+            progressPct: hasCapacity
+              ? Math.min(100, (subscribers.length / capacity) * 100)
+              : p.progressPct,
           }
           return updatedPost
         }
@@ -1564,6 +1640,7 @@ function OrganizationDashboard({
       {section === 'community' && (
         <Community
           posts={posts}
+          animals={animals}
           onSavePost={handleSaveCommunityPost}
           onDeletePost={handleDeleteCommunityPost}
           onLikePost={handleLikeCommunityPost}
@@ -1575,6 +1652,7 @@ function OrganizationDashboard({
         <Animals
           animals={animals}
           candidates={candidates}
+          checkIns={checkIns}
           selectedAnimalId={selectedAnimalId}
           onSelectAnimal={setSelectedAnimalId}
           onAddAnimal={handleAddAnimal}

@@ -114,24 +114,24 @@ export function SupportChatWidget({ organizationName }: SupportChatWidgetProps) 
             color: '#fff',
             border: 'none',
             borderRadius: '50px',
-            padding: '12px 20px',
-            fontSize: '14px',
+            padding: '8px 14px',
+            fontSize: '12px',
             fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '6px',
             cursor: 'pointer',
             boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             transition: 'transform 0.2s ease',
           }}
         >
-          <span style={{ fontSize: '18px' }}>💬</span> Suporte Admins
+          <span style={{ fontSize: '14px' }}>💬</span> Suporte Admins
           <span
             style={{
               background: '#e53e3e',
               color: '#fff',
-              fontSize: '11px',
-              padding: '2px 6px',
+              fontSize: '9px',
+              padding: '2px 5px',
               borderRadius: '10px',
               fontWeight: 700,
             }}

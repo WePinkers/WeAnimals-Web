@@ -130,15 +130,32 @@ export type Candidate = {
   answers: { question: string; answer: string }[]
 }
 
+export type AnimalStatus = 'Rascunho' | 'Disponível' | 'Em processo' | 'Adotado' | 'Pausado'
+
 export type AnimalItem = {
   id: string
   name: string
   description: string
   size: 'Pequeno' | 'Médio' | 'Grande'
   arrivalDate: string
+  birthDate?: string
   traits: string[]
   requirements: string[]
   photos: string[]
+  coverPhoto?: string
+  species?: 'Cão' | 'Gato' | 'Outro'
+  sex?: 'Macho' | 'Fêmea' | 'Não informado'
+  breed?: string
+  estimatedAge?: string
+  status?: AnimalStatus
+  story?: string
+  health?: string[]
+  compatibility?: string[]
+  energyLevel?: 'Baixa' | 'Moderada' | 'Alta'
+  idealHome?: string
+  location?: string
+  adoptedAt?: string
+  publishedAt?: string
 }
 
 export type CampaignSubscriber = {
@@ -156,6 +173,54 @@ export type PostComment = {
   timeAgo: string
 }
 
+export type CampaignCategory = 'Castração' | 'Vacinação' | 'Adoção' | 'Doação'
+
+export type CommunityPostCategory = 'Achados' | 'Dúvida' | 'Aviso' | 'Outro'
+
+export type CampaignLocation = {
+  name: string
+  address: string
+}
+
+export type CommunityCampaign = {
+  startsAt?: string
+  endsAt?: string
+  location?: CampaignLocation
+  animalAudience?: string
+  capacity?: number | null
+  animalIds?: string[]
+  donation?: {
+    deadline?: string
+    goalAmount?: number | null
+    currentAmount?: number
+    acceptsPix: boolean
+    acceptsItems: boolean
+    neededItems: string[]
+  }
+}
+
+export type CommunityPostInput = {
+  id?: string
+  title: string
+  type: 'Campanha' | 'Post'
+  categoryLabel: string
+  description: string
+  progressText?: string
+  progressPct?: number
+  campaign?: CommunityCampaign
+  postCategory?: CommunityPostCategory
+  imageUrl?: string
+  imageUrls?: string[]
+  location?: CampaignLocation
+  postDetails?: {
+    subject?: string
+    animalType?: string
+    occurredAt?: string
+    expiresAt?: string
+    contact?: string
+  }
+}
+
 export type CommunityPost = {
   id: string
   author: string
@@ -170,6 +235,18 @@ export type CommunityPost = {
   likes?: number
   commentsList?: PostComment[]
   elapsed?: string
+  campaign?: CommunityCampaign
+  postCategory?: CommunityPostCategory
+  imageUrl?: string
+  imageUrls?: string[]
+  location?: CampaignLocation
+  postDetails?: {
+    subject?: string
+    animalType?: string
+    occurredAt?: string
+    expiresAt?: string
+    contact?: string
+  }
 }
 
 export type CheckInPeriod = 30 | 90 | 180
@@ -185,6 +262,14 @@ export type CheckInRecord = {
     CheckInPeriod,
     { label: string; value: string }[]
   >
+  animalId?: string
+  animalPhoto?: string
+  adoptionDate?: string
+  timeline?: {
+    period: CheckInPeriod
+    dueDate: string
+    status: 'agendado' | 'disponível' | 'respondido' | 'revisado'
+  }[]
 }
 
 export type OrganizationProfile = {
