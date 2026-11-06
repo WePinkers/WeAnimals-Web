@@ -1,13 +1,27 @@
 import { useState, type ChangeEvent } from 'react'
-import type { AnimalItem, Candidate, CandidateStatus } from '../types'
+import type {
+  AdoptionApplicationStatus,
+  AdoptionConversation,
+  AnimalItem,
+  Candidate,
+  CandidateStatus,
+} from '../types'
 import { useToast } from '../components/ToastContext'
+import { AnimalConversations } from '../components/AnimalConversations'
 
 interface AnimalsProps {
   animals: AnimalItem[]
   candidates: Candidate[]
+  adoptionConversations: AdoptionConversation[]
+  adoptionConversationsError?: string | null
   selectedAnimalId: string
   onSelectAnimal: (id: string) => void
-  onAddAnimal: (animal: Omit<AnimalItem, 'id'>) => void
+  onAddAnimal: (animal: Omit<AnimalItem, 'id'>) => Promise<void>
+  onSendAdoptionMessage: (conversationId: string, text: string) => Promise<void>
+  onUpdateApplicationStatus: (
+    candidateId: string,
+    status: AdoptionApplicationStatus,
+  ) => Promise<void>
   onUpdateCandidateStatus: (
     candidateId: string,
     status: CandidateStatus,
@@ -15,20 +29,108 @@ interface AnimalsProps {
   ) => void
 }
 
+function applicationStatusRank(status: AdoptionApplicationStatus): number {
+  switch (status) {
+    case 'pending':
+      return 0
+    case 'reviewing':
+      return 1
+    case 'approved':
+      return 2
+    case 'visit_scheduled':
+      return 3
+    case 'adopted':
+      return 4
+    case 'rejected':
+    case 'cancelled':
+      return Number.MAX_SAFE_INTEGER
+  }
+}
+
+function normalizeArrivalDate(value: string): string {
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+
+  const parts = trimmed.split('/').map((part) => part.trim())
+  if (parts.length !== 3) return ''
+
+  const [first, second, third] = parts
+  if (!/^\d{1,2}$/.test(first) || !/^\d{1,2}$/.test(second) || !/^\d{4}$/.test(third)) {
+    return ''
+  }
+
+  const firstNumber = Number(first)
+  const secondNumber = Number(second)
+  const month = firstNumber > 12 ? secondNumber : firstNumber
+  const day = firstNumber > 12 ? firstNumber : secondNumber
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) return ''
+  return `${third}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+const MAX_ANIMAL_PHOTO_DATA_URL_BYTES = 220_000
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result)
+      else reject(new Error('Não foi possível ler a foto.'))
+    }
+    reader.onerror = () => reject(new Error('Não foi possível ler a foto.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function compressAnimalPhoto(file: File): Promise<string> {
+  const source = await readFileAsDataUrl(file)
+  if (source.length <= MAX_ANIMAL_PHOTO_DATA_URL_BYTES) return source
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image()
+    element.onload = () => resolve(element)
+    element.onerror = () => reject(new Error('Não foi possível processar a foto.'))
+    element.src = source
+  })
+
+  const maxDimension = 900
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Não foi possível preparar a foto.')
+  context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+  const compressed = canvas.toDataURL('image/jpeg', 0.72)
+  if (compressed.length > MAX_ANIMAL_PHOTO_DATA_URL_BYTES) {
+    return canvas.toDataURL('image/jpeg', 0.5)
+  }
+  return compressed
+}
+
 export function Animals({
   animals,
   candidates,
+  adoptionConversations,
+  adoptionConversationsError,
   selectedAnimalId,
   onSelectAnimal,
   onAddAnimal,
+  onSendAdoptionMessage,
+  onUpdateApplicationStatus,
   onUpdateCandidateStatus,
 }: AnimalsProps) {
   const { showToast } = useToast()
   const [showForm, setShowForm] = useState(false)
 
   const [animalName, setAnimalName] = useState('')
+  const [animalSpecies, setAnimalSpecies] = useState<'Cão' | 'Gato' | 'Outro'>('Cão')
+  const [animalBreed, setAnimalBreed] = useState('')
+  const [animalAgeText, setAnimalAgeText] = useState('')
   const [animalSize, setAnimalSize] = useState<'Pequeno' | 'Médio' | 'Grande'>('Médio')
   const [arrivalDate, setArrivalDate] = useState('')
+  const [animalAbout, setAnimalAbout] = useState('')
   const [traits, setTraits] = useState<string[]>(['Vacinada', 'Castrada'])
   const [availableTraits, setAvailableTraits] = useState<string[]>([
     'Vacinada',
@@ -37,9 +139,18 @@ export function Animals({
   ])
   const [newTraitText, setNewTraitText] = useState('')
   const [animalPhotos, setAnimalPhotos] = useState<string[]>([])
-  const [formError, setFormError] = useState(false)
+  const [compatibility, setCompatibility] = useState<string[]>([])
+  const availableCompatibility = [
+    'Bom com crianças',
+    'Bom com outros cães',
+    'Bom com gatos',
+    'Energia moderada',
+    'Calmo em casa',
+  ]
+  const [formError, setFormError] = useState('')
 
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
+  const [activeAnimalPanel, setActiveAnimalPanel] = useState<'candidates' | 'conversations'>('candidates')
   const [showQuestionnaire, setShowQuestionnaire] = useState(false)
   const [justification, setJustification] = useState('')
   const [rejectError, setRejectError] = useState(false)
@@ -61,6 +172,16 @@ export function Animals({
     )
   }
 
+  function toggleCompatibility(item: string) {
+    if (!compatibility.includes(item) && compatibility.length >= 3) {
+      showToast('Escolha somente 3 opções de convivência.', 'i')
+      return
+    }
+    setCompatibility((prev) =>
+      prev.includes(item) ? prev.filter((value) => value !== item) : [...prev, item],
+    )
+  }
+
   function handleAddTrait() {
     const trimmed = newTraitText.trim()
     if (!trimmed) return
@@ -77,48 +198,75 @@ export function Animals({
     const files = event.target.files
     if (!files || files.length === 0) return
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setAnimalPhotos((prev) => [...prev, reader.result as string])
-        }
-      }
-      reader.readAsDataURL(file)
-    })
-    event.target.value = ''
+    void Promise.all(Array.from(files).map(compressAnimalPhoto))
+      .then((compressedPhotos) => {
+        setAnimalPhotos((prev) => [...prev, ...compressedPhotos])
+        setFormError('')
+      })
+      .catch(() => {
+        setFormError('Não foi possível processar a foto. Escolha outra imagem.')
+      })
+      .finally(() => {
+        event.target.value = ''
+      })
   }
 
   function handleRemovePhoto(indexToRemove: number) {
     setAnimalPhotos((prev) => prev.filter((_, idx) => idx !== indexToRemove))
   }
 
-  function handleSaveAnimal() {
-    if (!animalName.trim() || !arrivalDate) {
-      setFormError(true)
+  async function handleSaveAnimal() {
+    const name = animalName.trim()
+    const normalizedArrivalDate = normalizeArrivalDate(arrivalDate)
+    if (!name || !normalizedArrivalDate) {
+      setFormError(!name && !normalizedArrivalDate
+        ? 'Preencha o nome e a data de chegada.'
+        : !name
+          ? 'Preencha o nome do animal.'
+          : 'Informe uma data de chegada válida.')
       return
     }
-    setFormError(false)
-    onAddAnimal({
-      name: animalName.trim(),
-      description: `Porte ${animalSize} · chegada em ${arrivalDate}`,
-      size: animalSize,
-      arrivalDate,
-      traits,
-      requirements: ['Maior de 18 anos', 'Visita prévia'],
-      photos: animalPhotos,
-    })
+    setFormError('')
+    try {
+      await onAddAnimal({
+        name,
+        description: `Porte ${animalSize} · chegada em ${normalizedArrivalDate}`,
+        about: animalAbout.trim(),
+        species: animalSpecies,
+        breed: animalBreed.trim(),
+        ageText: animalAgeText.trim(),
+        size: animalSize,
+        arrivalDate: normalizedArrivalDate,
+        traits,
+        compatibility,
+        requirements: ['Maior de 18 anos', 'Visita prévia'],
+        photos: animalPhotos,
+      })
+    } catch (error) {
+      const errorCode = typeof error === 'object'
+        && error !== null
+        && 'code' in error
+        ? String((error as { code?: unknown }).code ?? '')
+        : ''
+      const errorMessage = errorCode === 'permission-denied'
+        ? 'O Firebase recusou a publicação. Publique as regras atuais e confirme se esta conta da ONG está aprovada.'
+        : errorCode === 'invalid-argument'
+          ? 'A foto ou algum dado ultrapassou o limite do Firebase. Escolha uma foto menor.'
+          : 'Não foi possível publicar o animal. Tente novamente.'
+      setFormError(errorMessage)
+      showToast(errorMessage, '!')
+      return
+    }
     setAnimalName('')
+    setAnimalSpecies('Cão')
+    setAnimalBreed('')
+    setAnimalAgeText('')
     setArrivalDate('')
+    setAnimalAbout('')
+    setCompatibility([])
     setAnimalPhotos([])
     setShowForm(false)
     showToast('Animal cadastrado com fotos e publicado para adoção!', '🐾')
-  }
-
-  function handleApprove() {
-    if (!currentCandidate) return
-    onUpdateCandidateStatus(currentCandidate.id, 'aprovado')
-    showToast(`Adoção aprovada para ${currentCandidate.name}!`, '🎉')
   }
 
   function handleReject() {
@@ -132,6 +280,39 @@ export function Animals({
     setJustification('')
     showToast(`Candidatura de ${currentCandidate.name} recusada.`, '✕')
   }
+
+  const applicationStatusOptions: Array<{
+    value: AdoptionApplicationStatus
+    label: string
+  }> = [
+    { value: 'reviewing', label: 'Em análise' },
+    { value: 'visit_scheduled', label: 'Visita agendada' },
+    { value: 'adopted', label: 'Adoção confirmada' },
+  ]
+
+  function handleApplicationStatusChange(status: AdoptionApplicationStatus) {
+    if (!currentCandidate) return
+    if (status === 'rejected' && !justification.trim()) {
+      setRejectError(true)
+      return
+    }
+    setRejectError(false)
+    void onUpdateApplicationStatus(currentCandidate.id, status)
+    setJustification('')
+    const statusLabel = applicationStatusOptions.find((option) => option.value === status)?.label
+      ?? (status === 'rejected' ? 'Recusada' : status)
+    showToast(`Status atualizado para ${statusLabel.toLowerCase()}.`, '✓')
+  }
+
+  const currentApplicationStatus = currentCandidate?.applicationStatus ?? 'pending'
+  const currentApplicationRank = currentCandidate
+    ? applicationStatusRank(currentApplicationStatus)
+    : 0
+  const canChangeApplicationStatus = currentApplicationStatus === 'pending'
+    || currentApplicationStatus === 'reviewing'
+  const applicationIsAtOrPast = (status: AdoptionApplicationStatus) =>
+    status !== 'rejected'
+    && applicationStatusRank(status) <= currentApplicationRank
 
   return (
     <section className="portal-page">
@@ -157,7 +338,10 @@ export function Animals({
                 style={{ marginTop: 6 }}
                 placeholder="Ex: Duquesa"
                 value={animalName}
-                onChange={(e) => setAnimalName(e.target.value)}
+                onChange={(e) => {
+                  setAnimalName(e.target.value)
+                  setFormError('')
+                }}
               />
             </div>
             <div>
@@ -181,7 +365,48 @@ export function Animals({
                 type="date"
                 style={{ marginTop: 6 }}
                 value={arrivalDate}
-                onChange={(e) => setArrivalDate(e.target.value)}
+                onChange={(e) => {
+                  setArrivalDate(normalizeArrivalDate(e.target.value))
+                  setFormError('')
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="portal-grid g3" style={{ marginTop: 12 }}>
+            <div>
+              <div className="mono">Espécie</div>
+              <div className="chips" style={{ marginBottom: 0 }}>
+                {(['Cão', 'Gato', 'Outro'] as const).map((species) => (
+                  <button
+                    key={species}
+                    type="button"
+                    className={`chip ${animalSpecies === species ? 'sel' : ''}`}
+                    onClick={() => setAnimalSpecies(species)}
+                  >
+                    {species}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="mono">Raça ou tipo</div>
+              <input
+                type="text"
+                style={{ marginTop: 6 }}
+                placeholder="Ex: SRD"
+                value={animalBreed}
+                onChange={(e) => setAnimalBreed(e.target.value)}
+              />
+            </div>
+            <div>
+              <div className="mono">Idade</div>
+              <input
+                type="text"
+                style={{ marginTop: 6 }}
+                placeholder="Ex: 2 anos"
+                value={animalAgeText}
+                onChange={(e) => setAnimalAgeText(e.target.value)}
               />
             </div>
           </div>
@@ -291,9 +516,52 @@ export function Animals({
             />
           </div>
 
+          <div
+            className="animal-form-details"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.35fr)',
+              gap: 18,
+              marginTop: 18,
+            }}
+          >
+            <div>
+              <div className="mono">Convivência</div>
+              <div className="form-help">
+                Escolha somente 3 opções sobre como o animal convive no dia a dia.
+              </div>
+              <div className="chips" style={{ marginBottom: 0 }}>
+                {availableCompatibility.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`chip ${compatibility.includes(item) ? 'sel' : ''}`}
+                    disabled={compatibility.length >= 3 && !compatibility.includes(item)}
+                    onClick={() => toggleCompatibility(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mono">Sobre o animal</div>
+              <div className="form-help">
+                Conte um pouco sobre a personalidade, rotina e cuidados necessários.
+              </div>
+              <textarea
+                rows={4}
+                placeholder="Ex: Dócil, brincalhona e acostumada com pessoas..."
+                value={animalAbout}
+                onChange={(e) => setAnimalAbout(e.target.value)}
+              />
+            </div>
+          </div>
+
           {formError && (
             <div className="err" style={{ display: 'block' }}>
-              Preencha o nome e a data de chegada.
+              {formError}
             </div>
           )}
 
@@ -359,9 +627,32 @@ export function Animals({
         </div>
 
         <div className="card candidate-card">
-          <h2>Candidaturas · {currentAnimal?.name}</h2>
+          <div className="animal-panel-tabs" role="tablist" aria-label="Informações do animal">
+            <button
+              type="button"
+              className={activeAnimalPanel === 'candidates' ? 'active' : ''}
+              onClick={() => setActiveAnimalPanel('candidates')}
+            >
+              Candidaturas <span>{animalCandidates.length}</span>
+            </button>
+            <button
+              type="button"
+              className={activeAnimalPanel === 'conversations' ? 'active' : ''}
+              onClick={() => setActiveAnimalPanel('conversations')}
+            >
+              Conversas <span>{adoptionConversations.filter((conversation) => conversation.animalId === currentAnimal?.id).length}</span>
+            </button>
+          </div>
 
-          {animalCandidates.length === 0 ? (
+          {activeAnimalPanel === 'conversations' ? (
+            <AnimalConversations
+              animalId={currentAnimal?.id}
+              animalName={currentAnimal?.name ?? 'este animal'}
+              conversations={adoptionConversations}
+              error={adoptionConversationsError}
+              onSendMessage={onSendAdoptionMessage}
+            />
+          ) : animalCandidates.length === 0 ? (
             <div className="box">
               Ainda não há candidatos para {currentAnimal?.name}.
             </div>
@@ -377,11 +668,45 @@ export function Animals({
                   }}
                 >
                   <div className="ic">{cand.name.charAt(0)}</div>
-                  <div>
-                    <div className="t">
+                  <div
+                    style={{
+                      minWidth: 0,
+                      flex: 1,
+                      alignSelf: 'center',
+                      height: 34,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <div
+                      className="t"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        height: 18,
+                        minWidth: 0,
+                        overflow: 'visible',
+                        whiteSpace: 'nowrap',
+                        lineHeight: '18px',
+                      }}
+                    >
                       {cand.name}
                       {cand.status === 'aprovado' && (
-                        <span className="pill ok" style={{ marginLeft: 8 }}>
+                        <span
+                          className="pill ok"
+                          style={{
+                            marginLeft: 0,
+                            flexShrink: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            height: 18,
+                            padding: '0 8px',
+                            lineHeight: '18px',
+                            transform: 'translateY(6px)',
+                          }}
+                        >
                           Aprovado
                         </span>
                       )}
@@ -389,18 +714,35 @@ export function Animals({
                         <span
                           className="pill"
                           style={{
-                            marginLeft: 8,
+                            marginLeft: 0,
                             background: 'var(--a1)',
                             color: 'var(--a6)',
+                            flexShrink: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            height: 18,
+                            padding: '0 8px',
+                            lineHeight: '18px',
                           }}
                         >
                           Recusado
                         </span>
                       )}
                     </div>
-                    <div className="s">{cand.location}</div>
+                    <div
+                      style={{
+                        height: 14,
+                        margin: '2px 0 0',
+                        padding: 0,
+                        color: 'var(--i6)',
+                        fontSize: 12,
+                        lineHeight: '14px',
+                      }}
+                    >
+                      {cand.location}
+                    </div>
                   </div>
-                  <div className="r">
+                  <div className="r" style={{ alignSelf: 'center', flexShrink: 0 }}>
                     <b>{cand.pct}%</b>
                   </div>
                 </div>
@@ -443,7 +785,53 @@ export function Animals({
                     </div>
                   )}
 
-                  {currentCandidate.status === 'pendente' ? (
+                  {currentCandidate.applicationStatus ? (
+                    <div style={{ marginTop: 12 }}>
+                      <div className="mono">Atualizar status da candidatura</div>
+                      <div className="chips" style={{ marginTop: 8 }}>
+                        {applicationStatusOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`chip ${(
+                              currentCandidate.applicationStatus === option.value
+                              || (currentCandidate.applicationStatus === 'pending' && option.value === 'reviewing')
+                            ) ? 'sel' : ''}`}
+                            disabled={applicationIsAtOrPast(option.value)}
+                            onClick={() => handleApplicationStatusChange(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                      {canChangeApplicationStatus ? (
+                        <>
+                          <div className="mono" style={{ marginTop: 12 }}>
+                            Justificativa (obrigatória ao recusar)
+                          </div>
+                          <textarea
+                            placeholder="Motivo da decisão…"
+                            value={justification}
+                            onChange={(e) => setJustification(e.target.value)}
+                          />
+                          {rejectError && (
+                            <div className="err" style={{ display: 'block' }}>
+                              Escreva uma justificativa para recusar.
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                            <button
+                              type="button"
+                              className="btn rj"
+                              onClick={() => handleApplicationStatusChange('rejected')}
+                            >
+                              Recusar
+                            </button>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : currentCandidate.status === 'pendente' ? (
                     <div style={{ marginTop: 12 }}>
                       <div className="mono">Justificativa (obrigatória ao recusar)</div>
                       <textarea
@@ -459,9 +847,6 @@ export function Animals({
                       <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                         <button type="button" className="btn rj" onClick={handleReject}>
                           Recusar
-                        </button>
-                        <button type="button" className="btn ap" onClick={handleApprove}>
-                          Aprovar adoção
                         </button>
                       </div>
                     </div>

@@ -36,6 +36,7 @@ export function CheckIns({
   }
 
   const answers = selected?.reportsByPeriod[activePeriod] ?? []
+  const hasSubmitted = selected?.submittedByPeriod?.[activePeriod] ?? answers.length > 0
 
   return (
     <section className="portal-page">
@@ -56,7 +57,7 @@ export function CheckIns({
       <div className="portal-grid checkins-grid" style={{ gridTemplateColumns: '1fr 1.4fr', gap: '20px' }}>
         <div className="portal-card table-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ln)', background: '#f8fafc' }}>
-            <strong style={{ fontSize: '13.5px', color: '#1e293b' }}>Adoções em Acompanhamento</strong>
+            <strong style={{ fontSize: '13.5px', color: '#1e293b' }}>Todos os check-ins pós-adoção</strong>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -83,8 +84,26 @@ export function CheckIns({
                   }}
                 >
                   <td style={{ padding: '14px 16px' }}>
-                    <strong style={{ display: 'block', fontSize: '14px', color: '#1e293b' }}>{item.animal}</strong>
-                    <small style={{ color: '#64748b', fontSize: '12px' }}>{item.adopter}</small>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {item.photoUrl ? (
+                        <img
+                          src={item.photoUrl}
+                          alt={item.animal}
+                          style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '10px', border: '1px solid var(--ln)', flexShrink: 0 }}
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          style={{ width: '44px', height: '44px', display: 'grid', placeItems: 'center', borderRadius: '10px', background: '#f1eee4', color: '#2d5a3c', fontSize: '20px', flexShrink: 0 }}
+                        >
+                          🐾
+                        </span>
+                      )}
+                      <span>
+                        <strong style={{ display: 'block', fontSize: '14px', color: '#1e293b' }}>{item.animal}</strong>
+                        <small style={{ color: '#64748b', fontSize: '12px' }}>{item.adopter}</small>
+                      </span>
+                    </div>
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#334155' }}>{item.currentDays} dias</td>
                   <td style={{ padding: '14px 16px' }}>
@@ -94,8 +113,16 @@ export function CheckIns({
                         borderRadius: '20px',
                         fontSize: '11.5px',
                         fontWeight: 700,
-                        background: item.status === 'Ótima' ? '#dcfce7' : '#fef9c3',
-                        color: item.status === 'Ótima' ? '#166534' : '#854d0e',
+                        background: item.status === 'Ótima' || item.status === 'Boa'
+                          ? '#dcfce7'
+                          : item.status === 'Difícil'
+                            ? '#fee2e2'
+                            : '#fef9c3',
+                        color: item.status === 'Ótima' || item.status === 'Boa'
+                          ? '#166534'
+                          : item.status === 'Difícil'
+                            ? '#991b1b'
+                            : '#854d0e',
                       }}
                     >
                       {item.status}
@@ -109,13 +136,29 @@ export function CheckIns({
 
         <div className="portal-card checkin-detail" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}>
           <div className="head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--ln)', paddingBottom: '16px', margin: 0 }}>
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {selected.photoUrl ? (
+                <img
+                  src={selected.photoUrl}
+                  alt={selected.animal}
+                  style={{ width: '58px', height: '58px', objectFit: 'cover', borderRadius: '12px', border: '1px solid var(--ln)', flexShrink: 0 }}
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  style={{ width: '58px', height: '58px', display: 'grid', placeItems: 'center', borderRadius: '12px', background: '#f1eee4', color: '#2d5a3c', fontSize: '24px', flexShrink: 0 }}
+                >
+                  🐾
+                </span>
+              )}
+              <div>
               <span style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 700, color: '#64748b', letterSpacing: '0.5px' }}>
                 Relatório do Tutor
               </span>
               <h2 style={{ margin: '4px 0 0 0', fontSize: '20px', color: '#1e293b' }}>
                 {selected.animal} <span style={{ fontWeight: 400, color: '#64748b' }}>· {selected.adopter}</span>
               </h2>
+              </div>
             </div>
             {!selected.reviewed ? (
               <button
@@ -166,6 +209,12 @@ export function CheckIns({
             <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
               Respostas do Questionário ({activePeriod} dias)
             </div>
+
+            {!hasSubmitted && answers.length > 0 && (
+              <div style={{ padding: '10px 14px', background: '#fffbeb', border: '1px solid #f1dfad', borderRadius: '10px', color: '#854d0e', fontSize: '12.5px' }}>
+                Este check-in ainda não foi respondido. As perguntas abaixo são as do aplicativo para o período de {activePeriod} dias.
+              </div>
+            )}
 
             {answers.length === 0 ? (
               <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '10px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>

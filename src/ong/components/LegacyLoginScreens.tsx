@@ -832,6 +832,82 @@ function LegalDocumentModal({
           &times;
         </button>
         <h2>{isTerms ? 'Termos de Uso' : 'Política de Privacidade'}</h2>
+        <p className="legal-modal-date">Última atualização: 5 de novembro de 2026</p>
+        {isTerms ? (
+          <div className="legal-document-content">
+            <h3>1. Sobre a plataforma</h3>
+            <p>
+              O WeAnimals conecta pessoas, ONGs e abrigos para facilitar o cuidado,
+              a proteção e a adoção responsável de animais.
+            </p>
+
+            <h3>2. Credenciamento institucional</h3>
+            <p>
+              A instituição declara que possui autorização para representar a ONG ou
+              abrigo informado e que os dados enviados são verdadeiros e atuais.
+              O credenciamento passa por análise e pode ser aprovado, recusado ou
+              revisado pela equipe responsável.
+            </p>
+
+            <h3>3. Uso responsável</h3>
+            <p>
+              O acesso deve ser utilizado somente para atividades relacionadas à
+              proteção animal. Não é permitido publicar informações falsas, enviar
+              conteúdo ofensivo ou usar a plataforma para finalidades ilegais.
+            </p>
+
+            <h3>4. Publicações e mensagens</h3>
+            <p>
+              A instituição é responsável pelas informações que publica, pelas
+              mensagens que envia e pelo atendimento prestado aos usuários. O
+              WeAnimals pode remover conteúdos que violem estes termos.
+            </p>
+
+            <h3>5. Aceite</h3>
+            <p>
+              Ao marcar o aceite, a pessoa responsável confirma que leu e concorda
+              com estas condições em nome da instituição.
+            </p>
+          </div>
+        ) : (
+          <div className="legal-document-content">
+            <h3>1. Dados utilizados</h3>
+            <p>
+              Podemos utilizar os dados institucionais, dados do responsável,
+              informações de acesso, chave Pix, documentos enviados e conteúdos
+              publicados na plataforma.
+            </p>
+
+            <h3>2. Para que usamos os dados</h3>
+            <p>
+              Os dados são usados para analisar o credenciamento, permitir o acesso
+              ao painel, sincronizar denúncias, adoções, mensagens e publicações e
+              manter a segurança da plataforma.
+            </p>
+
+            <h3>3. Visibilidade das informações</h3>
+            <p>
+              Dados de credenciamento e documentos ficam restritos à análise
+              institucional. Publicações, campanhas e mensagens destinadas à
+              comunidade podem ser exibidas aos usuários e às instituições
+              participantes, conforme a finalidade do serviço.
+            </p>
+
+            <h3>4. Segurança e armazenamento</h3>
+            <p>
+              Adotamos medidas técnicas e administrativas para proteger as
+              informações. O acesso é controlado por autenticação e os dados são
+              mantidos pelo período necessário para cumprir as finalidades da
+              plataforma e as obrigações aplicáveis.
+            </p>
+
+            <h3>5. Seus direitos</h3>
+            <p>
+              A instituição pode solicitar informações sobre o uso dos seus dados,
+              correções ou esclarecimentos pelo canal de contato do WeAnimals.
+            </p>
+          </div>
+        )}
         <button type="button" className="primary-button legal-modal-button" onClick={onClose}>
           Entendi
         </button>

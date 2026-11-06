@@ -67,7 +67,9 @@ export async function signInOrganization(
     const cleanCnpj = trimmed.replace(/\D/g, '')
     // A conta fake de teste precisa funcionar tanto no Vite local quanto no
     // build publicado que usamos para a demonstração.
-    const isTemporaryAccess = cleanCnpj === TEMPORARY_CNPJ
+    const isTemporaryAccess =
+      cleanCnpj === TEMPORARY_CNPJ
+      || trimmed.toLowerCase() === TEMPORARY_EMAIL
 
     if (!trimmed.includes('@') && !isTemporaryAccess) {
       const cleanCnpj = trimmed.replace(/\D/g, '')

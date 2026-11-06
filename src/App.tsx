@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   onAuthStateChanged,
@@ -7,16 +7,24 @@ import {
   type User,
 } from 'firebase/auth'
 import { 
+  addDoc,
   collection, 
+  collectionGroup,
+  getDocs,
   onSnapshot, 
   doc, 
+  getDoc,
   setDoc,
   updateDoc, 
   deleteDoc, 
+  deleteField,
   increment,
+  runTransaction,
+  Bytes,
   orderBy,
   query,
   where,
+  limit,
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore'
@@ -50,10 +58,18 @@ import type {
   Report,
   ChatMessage,
   AppNotification,
+  AdoptionConversation,
   AnimalItem,
   Candidate,
   CandidateStatus,
+  AdoptionApplicationStatus,
   CommunityPost,
+  CommunityPostInput,
+  CommunityCampaignAnimalInput,
+  CommunityPostCategory,
+  CampaignCategory,
+  PostComment,
+  CheckInPeriod,
   CheckInRecord,
   OrganizationProfile,
 } from './ong/types'
@@ -92,13 +108,200 @@ const initialAnimals: AnimalItem[] = [
     id: 'ani-1',
     name: 'Canela',
     description: 'SRD · 2 anos',
+    about: 'Resgatada em janeiro, dócil com crianças e outros cães. Castrada, vacinada e vermifugada.',
     size: 'Médio',
     arrivalDate: '2026-04-10',
     traits: ['Vacinada', 'Castrada', 'Dócil'],
+    compatibility: ['Bom com crianças', 'Bom com outros cães', 'Energia moderada'],
     requirements: ['Maior de 18 anos', 'Visita prévia'],
     photos: [],
   },
 ]
+
+function mapAdoptionAnimalDocument(id: string, data: Record<string, any>): AnimalItem {
+  const species = data.especie === 'gato' ? 'Gato' : data.especie === 'outro' ? 'Outro' : 'Cão'
+  const traits = Array.isArray(data.caracteristicas)
+    ? data.caracteristicas.filter((value: unknown): value is string => typeof value === 'string')
+    : []
+  const compatibility = [
+    ...(Array.isArray(data.convivencia)
+      ? data.convivencia.filter((value: unknown): value is string => typeof value === 'string')
+      : []),
+    data.bom_com_criancas === true ? 'Bom com crianças' : '',
+    data.bom_com_outros_animais === true ? 'Bom com outros animais' : '',
+    data.nivel_energia === 'moderada' ? 'Energia moderada' :
+      data.nivel_energia === 'alta' ? 'Energia alta' :
+        data.nivel_energia === 'baixa' ? 'Energia tranquila' : '',
+  ].filter(Boolean)
+  const photos = Array.isArray(data.foto_urls)
+    ? data.foto_urls.filter((value: unknown): value is string => typeof value === 'string')
+    : []
+  const coverPhoto = typeof data.foto_url === 'string' && data.foto_url ? data.foto_url : photos[0]
+
+  return {
+    id,
+    name: data.nome || 'Animal sem nome',
+    description: [data.raca, data.idade_texto].filter(Boolean).join(' · ') || `Porte ${data.porte || 'não informado'}`,
+    about: data.descricao || '',
+    species,
+    breed: data.raca || '',
+    ageText: data.idade_texto || '',
+    size: data.porte || 'Médio',
+    arrivalDate: data.chegada_ao_abrigo || '',
+    traits,
+    compatibility,
+    requirements: Array.isArray(data.requisitos_adocao) ? data.requisitos_adocao : [],
+    photos: coverPhoto ? [coverPhoto, ...photos.filter((photo: string) => photo !== coverPhoto)] : photos,
+  }
+}
+
+function adoptionSpeciesValue(species: AnimalItem['species']) {
+  if (species === 'Gato') return 'gato'
+  if (species === 'Outro') return 'outro'
+  return 'cao'
+}
+
+function ageYearsFromText(ageText: string | undefined) {
+  const match = ageText?.match(/\d+/)
+  return match ? Number(match[0]) : null
+}
+
+function adoptionUserName(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const name = value.trim()
+  if (!name) return null
+  const normalized = name.toLocaleLowerCase('pt-BR')
+  if (normalized === 'usuário interessado' || normalized === 'usuario interessado') return null
+  return name
+}
+
+function adoptionCandidateStatus(value: unknown): CandidateStatus {
+  switch (value) {
+    case 'approved':
+    case 'visit_scheduled':
+    case 'adopted':
+      return 'aprovado'
+    case 'rejected':
+    case 'cancelled':
+      return 'recusado'
+    default:
+      return 'pendente'
+  }
+}
+
+function adoptionApplicationStatus(value: unknown): AdoptionApplicationStatus {
+  switch (value) {
+    case 'reviewing':
+    case 'approved':
+    case 'rejected':
+    case 'visit_scheduled':
+    case 'adopted':
+    case 'cancelled':
+      return value
+    default:
+      return 'pending'
+  }
+}
+
+function adoptionApplicationStatusRank(status: AdoptionApplicationStatus): number {
+  switch (status) {
+    case 'pending':
+      return 0
+    case 'reviewing':
+      return 1
+    case 'approved':
+      return 2
+    case 'visit_scheduled':
+      return 3
+    case 'adopted':
+      return 4
+    case 'rejected':
+    case 'cancelled':
+      return Number.MAX_SAFE_INTEGER
+  }
+}
+
+const adoptionQuestionnaireFields = [
+  {
+    key: 'routine',
+    question: 'Como é a sua rotina?',
+    options: {
+      away_all_day: 'Fora o dia todo',
+      home_office: 'Home office',
+      often_home: 'Bastante em casa',
+    },
+  },
+  {
+    key: 'availableSpace',
+    question: 'Que espaço você tem disponível?',
+    options: {
+      small_apartment: 'Apto pequeno',
+      apartment_with_balcony: 'Apto com varanda',
+      house_with_yard: 'Casa com quintal',
+    },
+  },
+  {
+    key: 'petExperience',
+    question: 'Já teve animais antes?',
+    options: {
+      first_time: 'Primeira vez',
+      had_pets_before: 'Já tive antes',
+      has_other_pets: 'Tenho outros agora',
+    },
+  },
+  {
+    key: 'dailyTime',
+    question: 'Quanto tempo disponível por dia?',
+    options: {
+      less_than_one_hour: 'Menos de 1h',
+      one_to_three_hours: '1 a 3h',
+      more_than_three_hours: 'Mais de 3h',
+    },
+  },
+  {
+    key: 'household',
+    question: 'Há crianças ou outros animais em casa?',
+    options: {
+      lives_alone: 'Só eu',
+      young_children: 'Crianças pequenas',
+      other_pets: 'Outros pets',
+    },
+  },
+] as const
+
+function mapAdoptionQuestionnaireAnswers(profile: Record<string, any>) {
+  return adoptionQuestionnaireFields.flatMap(({ key, question, options }) => {
+    const value = profile[key]
+    if (typeof value !== 'string' || !value.trim()) return []
+    return [{
+      question,
+      answer: options[value as keyof typeof options] ?? value,
+    }]
+  })
+}
+
+function mapAdoptionApplicationCandidate(
+  applicationId: string,
+  data: Record<string, any>,
+): Candidate {
+  const profile = data.profile && typeof data.profile === 'object' ? data.profile : {}
+  const answers = mapAdoptionQuestionnaireAnswers(profile)
+
+  return {
+    id: applicationId,
+    animalId: typeof data.animalId === 'string' ? data.animalId : '',
+    userId: typeof data.userId === 'string' ? data.userId : undefined,
+    name: adoptionUserName(data.userName) ?? 'Usuário interessado',
+    pct: typeof data.matchPercentage === 'number' ? data.matchPercentage : 0,
+    location: typeof data.shelterName === 'string' && data.shelterName.trim()
+      ? data.shelterName
+      : 'Candidatura enviada pelo app',
+    summary: 'Candidatura enviada pelo aplicativo',
+    status: adoptionCandidateStatus(data.status),
+    applicationStatus: adoptionApplicationStatus(data.status),
+    answers,
+  }
+}
 
 const initialCandidates: Candidate[] = [
   {
@@ -117,20 +320,298 @@ const initialCandidates: Candidate[] = [
   },
 ]
 
-const initialPosts: CommunityPost[] = [
-  {
-    id: 'post-1',
-    author: 'Abrigo Esperança',
-    isOwn: true,
+const communityPostLabels: Record<string, CommunityPostCategory> = {
+  FOUND: 'Achados',
+  QUESTION: 'Dúvida',
+  NOTICE: 'Aviso',
+  OTHER: 'Outro',
+}
+
+const communityCampaignLabels: Record<string, CampaignCategory> = {
+  NEUTERING: 'Castração',
+  VACCINATION: 'Vacinação',
+  ADOPTION: 'Adoção',
+  DONATION: 'Doação',
+}
+
+function communityTimestampMillis(value: unknown) {
+  if (value && typeof (value as { toMillis?: () => number }).toMillis === 'function') {
+    return (value as { toMillis: () => number }).toMillis()
+  }
+  if (value instanceof Date) return value.getTime()
+  return 0
+}
+
+function communityElapsed(value: unknown) {
+  const millis = communityTimestampMillis(value)
+  if (!millis) return 'agora'
+  const minutes = Math.max(0, Math.floor((Date.now() - millis) / 60000))
+  if (minutes < 1) return 'agora'
+  if (minutes < 60) return `há ${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `há ${hours} h`
+  return `há ${Math.floor(hours / 24)} d`
+}
+
+function communityPhotoUrl(value: unknown) {
+  if (value && typeof (value as { toBase64?: () => string }).toBase64 === 'function') {
+    return `data:image/jpeg;base64,${(value as { toBase64: () => string }).toBase64()}`
+  }
+  return typeof value === 'string' ? value : undefined
+}
+
+function communityPhotoBytes(value?: string) {
+  if (!value?.startsWith('data:')) return undefined
+  const base64 = value.split(',', 2)[1]
+  // Keep the decoded Firestore bytes below the 200 KB rule limit.
+  if (!base64 || base64.length > 250000) return undefined
+  try {
+    return Bytes.fromBase64String(base64)
+  } catch {
+    return undefined
+  }
+}
+
+async function syncCommunityCampaignAnimals(campaignId: string, animals: CommunityCampaignAnimalInput[]) {
+  const animalsCollection = collection(db, 'community_campaigns', campaignId, 'animals')
+  const existingSnapshot = await getDocs(animalsCollection)
+  const batch = writeBatch(db)
+  const existingAnimals = new Map(
+    existingSnapshot.docs.map((animalDoc) => [animalDoc.id, animalDoc.data()]),
+  )
+  const normalizedAnimals = animals
+    .filter((animal) => animal.name.trim())
+    .slice(0, 50)
+
+  existingSnapshot.docs.forEach((animalDoc) => {
+    if (!normalizedAnimals.some((_, index) => animalDoc.id === `animal-${index + 1}`)) {
+      batch.delete(animalDoc.ref)
+    }
+  })
+
+  normalizedAnimals.forEach((animal, index) => {
+    const animalId = `animal-${index + 1}`
+    const existingAnimal = existingAnimals.get(animalId)
+    const data: Record<string, any> = {
+      name: animal.name.trim().slice(0, 80),
+      breed: animal.breed.trim().slice(0, 80),
+      ageText: animal.ageText.trim().slice(0, 80),
+      createdAt: existingAnimal?.createdAt ?? serverTimestamp(),
+    }
+    const photoData = communityPhotoBytes(animal.photoUrl)
+    if (photoData) {
+      data.photoData = photoData
+    } else if (existingAnimal) {
+      // deleteField() is valid when merging an existing document, but not
+      // when creating a brand-new document with set().
+      data.photoData = deleteField()
+      batch.set(doc(animalsCollection, animalId), data, { merge: true })
+      return
+    }
+    batch.set(doc(animalsCollection, animalId), data)
+  })
+
+  await batch.commit()
+}
+
+function mapCommunityPostDocument(id: string, data: Record<string, any>, currentUserId?: string): CommunityPost | null {
+  const category = communityPostLabels[String(data.category ?? '').toUpperCase()]
+  const description = String(data.body ?? data.description ?? '').trim()
+  if (!category || !description) return null
+  const photo = communityPhotoUrl(data.photoData ?? data.imageUrl)
+  const locationLabel = String(data.locationLabel ?? '').trim()
+  return {
+    id,
+    author: String(data.authorName ?? 'Membro da comunidade'),
+    authorId: typeof data.authorId === 'string' ? data.authorId : undefined,
+    isOwn: data.authorId === currentUserId,
+    type: 'Post',
+    categoryLabel: category,
+    title: String(data.title ?? category),
+    description,
+    likes: Number(data.likesCount ?? data.likes ?? 0),
+    likedByCurrentUser: false,
+    commentsList: [],
+    elapsed: communityElapsed(data.createdAt),
+    createdAtMillis: communityTimestampMillis(data.createdAt),
+    postCategory: category,
+    imageUrl: photo,
+    imageUrls: photo ? [photo] : [],
+    location: locationLabel ? { name: locationLabel, address: '' } : undefined,
+  }
+}
+
+function mapCommunityCampaignDocument(id: string, data: Record<string, any>, currentUserId?: string): CommunityPost | null {
+  const category = communityCampaignLabels[String(data.category ?? '').toUpperCase()]
+  const title = String(data.title ?? '').trim()
+  if (!category || !title) return null
+  const totalSlots = typeof data.totalSlots === 'number' ? data.totalSlots : undefined
+  const filledSlots = typeof data.filledSlots === 'number' ? data.filledSlots : 0
+  const goalCents = typeof data.donationGoalCents === 'number' ? data.donationGoalCents : undefined
+  const raisedCents = typeof data.donationRaisedCents === 'number' ? data.donationRaisedCents : 0
+  const photo = communityPhotoUrl(data.photoData ?? data.imageUrl)
+  const locationName = String(data.locationLabel ?? '').trim()
+  const locationText = String(data.locationText ?? '').trim()
+  const progressText = goalCents
+    ? `R$ ${(raisedCents / 100).toFixed(2)} de R$ ${(goalCents / 100).toFixed(2)}`
+    : totalSlots
+      ? `${filledSlots} de ${totalSlots} vagas preenchidas`
+      : String(data.availabilityText ?? 'Sem limite de vagas')
+  const progressPct = goalCents
+    ? Math.min(100, (raisedCents / goalCents) * 100)
+    : totalSlots
+      ? Math.min(100, (filledSlots / totalSlots) * 100)
+      : 0
+  return {
+    id,
+    author: String(data.organizationName ?? 'Organização parceira'),
+    isOwn: data.createdBy === currentUserId,
     type: 'Campanha',
-    categoryLabel: 'Castração',
-    title: 'Mutirão de sábado',
-    description: 'Sáb, 6 set · 8h–13h · Vila Marlene',
-    progressText: '28 de 60 vagas',
-    progressPct: 47,
+    categoryLabel: category,
+    title,
+    description: String(data.description ?? '').trim(),
+    progressText,
+    progressPct,
     subscribers: [],
-  },
-]
+    elapsed: communityElapsed(data.createdAt),
+    createdAtMillis: communityTimestampMillis(data.createdAt),
+    imageUrl: photo,
+    imageUrls: photo ? [photo] : [],
+    campaign: {
+      startsAt: typeof data.startsAt === 'string' ? data.startsAt : undefined,
+      endsAt: typeof data.endsAt === 'string' ? data.endsAt : undefined,
+      dateText: String(data.dateText ?? ''),
+      location: { name: locationName || locationText, address: locationText },
+      animalAudience: String(data.audienceText ?? ''),
+      capacity: totalSlots ?? null,
+      donation: category === 'Doação'
+        ? {
+            goalAmount: goalCents == null ? null : goalCents / 100,
+            currentAmount: raisedCents / 100,
+            acceptsPix: Boolean(data.pixKey),
+            pixKey: typeof data.pixKey === 'string' ? data.pixKey : undefined,
+            acceptsItems: Array.isArray(data.donationNeeds) && data.donationNeeds.length > 0,
+            neededItems: Array.isArray(data.donationNeeds) ? data.donationNeeds : [],
+          }
+        : undefined,
+    },
+    location: locationName || locationText
+      ? { name: locationName || locationText, address: locationText }
+      : undefined,
+  }
+}
+
+const adoptionCheckInQuestions: Record<CheckInPeriod, { id: string; label: string }[]> = {
+  30: [
+    { id: 'routine_adjusted', label: 'O animal já se acostumou com a rotina da casa?' },
+    { id: 'health_or_behavior_issue', label: 'Teve algum problema de saúde ou comportamento nesse período?' },
+  ],
+  90: [
+    { id: 'walks_and_feeding_established', label: 'A rotina de passeios e alimentação já está estabelecida?' },
+    { id: 'behavior_changed', label: 'O comportamento mudou desde o último check-in?' },
+    { id: 'regular_vet_visits', label: 'JÁ LEVA AO VETERINÁRIO COM REGULARIDADE?' },
+  ],
+  180: [
+    { id: 'strong_bond', label: 'Vocês já formaram um vínculo forte?' },
+    { id: 'shelter_support_needed', label: 'Sente que precisa de algum suporte do abrigo agora?' },
+    { id: 'recommend_adoption', label: 'RECOMENDARIA A ADOÇÃO PARA OUTRAS PESSOAS?' },
+  ],
+}
+
+const checkInAnswerLabels: Record<string, string> = {
+  yes: 'Sim',
+  no: 'Não',
+  partly: 'Em parte',
+  yes_certainly: 'Sim, com certeza',
+  maybe: 'Talvez',
+}
+
+function checkInStatusFromRating(rating: unknown): CheckInRecord['status'] {
+  switch (rating) {
+    case 'excellent':
+      return 'Ótima'
+    case 'good':
+      return 'Boa'
+    case 'some_challenges':
+      return 'Alguns desafios'
+    case 'difficult':
+      return 'Difícil'
+    default:
+      return 'Não respondido'
+  }
+}
+
+function checkInReportsForPeriod(
+  period: CheckInPeriod,
+  checkInData?: Record<string, any>,
+): { label: string; value: string }[] {
+  const reports = adoptionCheckInQuestions[period].map((question) => ({
+    label: question.label,
+    value: checkInData
+      ? checkInAnswerLabels[String(checkInData.answers?.[question.id])] ?? 'Não informado'
+      : 'Aguardando resposta do tutor',
+  }))
+
+  const note = typeof checkInData?.note === 'string' ? checkInData.note.trim() : ''
+  if (note) reports.push({ label: 'Observação do tutor', value: note })
+
+  return reports
+}
+
+function mapAdoptionCheckInRecord(
+  applicationDocument: any,
+  checkInDocuments: any[],
+): CheckInRecord {
+  const applicationData = applicationDocument.data() as Record<string, any>
+  const userId = applicationDocument.ref.parent.parent?.id ?? applicationData.userId ?? 'user'
+  const animalId = applicationDocument.id
+  const checkInsByPeriod = new Map<CheckInPeriod, Record<string, any>>()
+
+  checkInDocuments.forEach((checkInDocument) => {
+    const data = checkInDocument.data() as Record<string, any>
+    const period = Number(data.milestoneDays) as CheckInPeriod
+    if ([30, 90, 180].includes(period)) checkInsByPeriod.set(period, data)
+  })
+
+  const submittedByPeriod = {
+    30: checkInsByPeriod.has(30),
+    90: checkInsByPeriod.has(90),
+    180: checkInsByPeriod.has(180),
+  }
+  const submittedPeriods = ([30, 90, 180] as const).filter((period) => submittedByPeriod[period])
+  const latestPeriod = submittedPeriods[submittedPeriods.length - 1]
+  const currentDays: CheckInPeriod = latestPeriod === 30
+    ? 90
+    : latestPeriod === 90
+      ? 180
+      : latestPeriod === 180
+        ? 180
+        : 30
+  const latestCheckIn = latestPeriod ? checkInsByPeriod.get(latestPeriod) : undefined
+
+  return {
+    id: `adoption-checkin:${userId}:${animalId}`,
+    animal: String(applicationData.animalName ?? 'Animal'),
+    photoUrl: typeof applicationData.photoUrl === 'string'
+      ? applicationData.photoUrl
+      : typeof applicationData.fotoUrl === 'string'
+        ? applicationData.fotoUrl
+        : undefined,
+    adopter: adoptionUserName(applicationData.userName)
+      ?? adoptionUserName(applicationData.adopterName)
+      ?? 'Adotante',
+    currentDays,
+    status: latestCheckIn ? checkInStatusFromRating(latestCheckIn.rating) : 'Não respondido',
+    reviewed: false,
+    reportsByPeriod: {
+      30: checkInReportsForPeriod(30, checkInsByPeriod.get(30)),
+      90: checkInReportsForPeriod(90, checkInsByPeriod.get(90)),
+      180: checkInReportsForPeriod(180, checkInsByPeriod.get(180)),
+    },
+    questionsByPeriod: adoptionCheckInQuestions,
+    submittedByPeriod,
+  }
+}
 
 const initialCheckIns: CheckInRecord[] = [
   {
@@ -141,10 +622,12 @@ const initialCheckIns: CheckInRecord[] = [
     status: 'Ótima',
     reviewed: false,
     reportsByPeriod: {
-      30: [{ label: 'Adaptação (30d)', value: 'Boa' }],
-      90: [{ label: 'Adaptação (90d)', value: 'Ótima' }],
-      180: [{ label: 'Status (180d)', value: 'Ainda dentro do prazo' }],
+      30: checkInReportsForPeriod(30, { answers: { routine_adjusted: 'yes', health_or_behavior_issue: 'no' } }),
+      90: checkInReportsForPeriod(90, { answers: { walks_and_feeding_established: 'yes', behavior_changed: 'no', regular_vet_visits: 'yes' } }),
+      180: checkInReportsForPeriod(180, { answers: { strong_bond: 'yes', shelter_support_needed: 'no', recommend_adoption: 'yes_certainly' } }),
     },
+    questionsByPeriod: adoptionCheckInQuestions,
+    submittedByPeriod: { 30: true, 90: true, 180: true },
   },
 ]
 
@@ -311,6 +794,13 @@ function formatOrganizationIdentifier(value: string) {
     '-' +
     digits.slice(12)
   )
+}
+
+function normalizeOrganizationCnpj(value: unknown) {
+  const text = String(value ?? '').trim()
+  if (!text) return ''
+  const digits = text.replace(/\D/g, '')
+  return digits.length === 14 ? formatOrganizationIdentifier(digits) : text
 }
 
 type ReportPriorityPresentation = {
@@ -870,6 +1360,8 @@ function OrganizationDashboard({
     return saved ? JSON.parse(saved) : initialAnimals
   })
   const [selectedAnimalId, setSelectedAnimalId] = useState<string>(() => animals[0]?.id ?? 'ani-1')
+  const [adoptionConversations, setAdoptionConversations] = useState<AdoptionConversation[]>([])
+  const [adoptionConversationsError, setAdoptionConversationsError] = useState<string | null>(null)
 
   const [candidates, setCandidates] = useState<Candidate[]>(() => {
     const saved = localStorage.getItem('weanimals_candidates')
@@ -877,8 +1369,7 @@ function OrganizationDashboard({
   })
 
   const [posts, setPosts] = useState<CommunityPost[]>(() => {
-    const saved = localStorage.getItem('weanimals_posts')
-    return saved ? JSON.parse(saved) : initialPosts
+    return []
   })
 
   const [checkIns, setCheckIns] = useState<CheckInRecord[]>(() => {
@@ -901,6 +1392,7 @@ function OrganizationDashboard({
           isVerified: true,
         }
   })
+  const profileWriteVersion = useRef(0)
 
   const [notifications, setNotifications] = useState<AppNotification[]>([
     {
@@ -1011,68 +1503,561 @@ function OrganizationDashboard({
       )
     })
 
-    const unsubscribeAnimals = onSnapshot(collection(db, 'animals'), (snapshot) => {
+    const authenticatedAnimalsQuery = query(
+      collection(db, 'animais'),
+      where('ong_id', '==', user.uid),
+    )
+    const unsubscribeAnimals = onSnapshot(authenticatedAnimalsQuery, (snapshot) => {
       if (!snapshot.empty) {
-        const realAnimals = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id,
-        })) as AnimalItem[]
-        setAnimals(realAnimals)
+        setAnimals(snapshot.docs.map((animalDoc) =>
+          mapAdoptionAnimalDocument(animalDoc.id, animalDoc.data()),
+        ))
       }
     })
 
-    const unsubscribeCandidates = onSnapshot(collection(db, 'candidates'), (snapshot) => {
-      if (!snapshot.empty) {
-        const realCandidates = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id,
-        })) as Candidate[]
-        setCandidates(realCandidates)
-      }
-    })
+    const isTemporaryTestOrganization = user.email?.toLowerCase() === 'alissanovais@gmail.com'
+    const adoptionConversationsQuery = isTemporaryTestOrganization
+      ? query(collectionGroup(db, 'animals'))
+      : query(
+          collectionGroup(db, 'animals'),
+          where('ngoId', '==', user.uid),
+        )
+    let messageUnsubscribers: Array<() => void> = []
+    let checkInUnsubscribers: Array<() => void> = []
+    let adoptionCheckInRecords = new Map<string, CheckInRecord>()
 
-    const unsubscribePosts = onSnapshot(collection(db, 'posts'), (snapshot) => {
-      if (!snapshot.empty) {
-        const realPosts = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id,
-        })) as CommunityPost[]
-        setPosts(realPosts)
-      }
-    })
+    const syncAdoptionCheckIns = (applicationDocs: any[]) => {
+      checkInUnsubscribers.forEach((unsubscribe) => unsubscribe())
+      checkInUnsubscribers = []
+      adoptionCheckInRecords = new Map()
 
-    const unsubscribeCheckIns = onSnapshot(collection(db, 'checkins'), (snapshot) => {
-      if (!snapshot.empty) {
-        const realCheckIns = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id,
-        })) as CheckInRecord[]
-        setCheckIns(realCheckIns)
-      }
-    })
+      const adoptedApplications = applicationDocs.filter((applicationDoc) => {
+        const data = applicationDoc.data() as Record<string, any>
+        return data.status === 'adopted' && data.ngoId === user.uid
+      })
 
-    const unsubscribeOrg = onSnapshot(doc(db, 'organizations', user.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        const orgData = docSnap.data()
-        setProfile((prev) => ({
-          ...prev,
-          name: orgData.name ?? prev.name,
-          cnpj: orgData.cnpj ?? prev.cnpj,
-          email: orgData.email ?? prev.email,
-          pixKey: orgData.pixKey ?? prev.pixKey,
-          responsibleName: orgData.responsibleName ?? prev.responsibleName,
-          isVerified: orgData.isVerified ?? prev.isVerified,
-          verifiedAt: orgData.verifiedAt ?? prev.verifiedAt, 
+      adoptedApplications.forEach((applicationDoc) => {
+        const initialRecord = mapAdoptionCheckInRecord(applicationDoc, [])
+        adoptionCheckInRecords.set(initialRecord.id, initialRecord)
+
+        const unsubscribe = onSnapshot(
+          collection(applicationDoc.ref, 'checkins'),
+          (snapshot) => {
+            adoptionCheckInRecords.set(
+              initialRecord.id,
+              mapAdoptionCheckInRecord(applicationDoc, snapshot.docs),
+            )
+            setCheckIns(Array.from(adoptionCheckInRecords.values()))
+          },
+          (error) => {
+            console.error(`Erro ao carregar o check-in da adoção ${initialRecord.id}:`, error)
+          },
+        )
+        checkInUnsubscribers.push(unsubscribe)
+      })
+
+      setCheckIns(Array.from(adoptionCheckInRecords.values()))
+    }
+
+    const unsubscribeAdoptionConversations = onSnapshot(
+      adoptionConversationsQuery,
+      (snapshot) => {
+        setAdoptionConversationsError(null)
+        messageUnsubscribers.forEach((unsubscribe) => unsubscribe())
+        messageUnsubscribers = []
+
+        // `animals` também é usado como subcoleção de candidaturas. Uma
+        // conversa tem `createdAt`; candidatura usa `submittedAt`.
+        const conversationDocs = snapshot.docs.filter((conversationDoc) => {
+          const data = conversationDoc.data()
+          return data.createdAt != null && typeof data.userId === 'string' && typeof data.animalId === 'string'
+        })
+        const applicationDocs = snapshot.docs.filter((applicationDoc) => {
+          const data = applicationDoc.data()
+          return data.submittedAt != null
+            && typeof data.userId === 'string'
+            && typeof data.animalId === 'string'
+        })
+        const conversationNames = new Map<string, string>()
+        conversationDocs.forEach((conversationDoc) => {
+          const userId = conversationDoc.ref.parent.parent?.id ?? ''
+          const name = adoptionUserName(conversationDoc.data().userName)
+          if (userId && name) conversationNames.set(`adoption:${userId}:${conversationDoc.id}`, name)
+        })
+
+        const applicationCandidates = applicationDocs
+          .filter((applicationDoc) => applicationDoc.data().status !== 'cancelled')
+          .map((applicationDoc) => {
+          const data = applicationDoc.data()
+          const userId = applicationDoc.ref.parent.parent?.id ?? data.userId
+          const animalId = applicationDoc.id
+          return mapAdoptionApplicationCandidate(
+            `adoption:${userId}:${animalId}`,
+            {
+              ...data,
+              animalId,
+              userName: conversationNames.get(`adoption:${userId}:${animalId}`) ?? data.userName,
+            },
+          )
+          })
+        setCandidates(applicationCandidates)
+        syncAdoptionCheckIns(applicationDocs)
+
+        // Assim que a ONG recebe a candidatura, ela já entra em análise.
+        // A mudança fica no mesmo documento que o app acompanha em tempo real.
+        applicationDocs
+          .filter((applicationDoc) => {
+            const data = applicationDoc.data()
+            return data.status === 'pending' && data.ngoId === user.uid
+          })
+          .forEach((applicationDoc) => {
+            const userId = applicationDoc.ref.parent.parent?.id
+            if (!userId) return
+            void updateDoc(
+              doc(db, 'adoption_applications', userId, 'animals', applicationDoc.id),
+              {
+                status: 'reviewing',
+                updatedAt: serverTimestamp(),
+              },
+            ).catch((error) => {
+              console.error('Não foi possível iniciar a análise da candidatura:', error)
+            })
+          })
+
+        // Mantém animais já aprovados/reservados fora do catálogo do app,
+        // inclusive candidaturas aprovadas antes desta regra ser adicionada.
+        applicationDocs
+          .filter((applicationDoc) => {
+            const data = applicationDoc.data()
+            return data.ngoId === user.uid
+              && ['approved', 'visit_scheduled', 'adopted'].includes(data.status)
+          })
+          .forEach((applicationDoc) => {
+            void updateDoc(doc(db, 'animais', applicationDoc.id), {
+              status: 'reservado',
+            }).catch((error) => {
+              console.error('Não foi possível reservar o animal após a aprovação:', error)
+            })
+          })
+
+        // O cadastro do app guarda o questionário, mas o nome fica no perfil
+        // do usuário. Preenche candidaturas antigas sem precisar de uma nova
+        // candidatura para aparecerem com o nome correto.
+        applicationDocs.forEach((applicationDoc) => {
+          const userId = applicationDoc.ref.parent.parent?.id
+          if (!userId) return
+          const applicationId = `adoption:${userId}:${applicationDoc.id}`
+          void Promise.all([
+            getDoc(doc(db, 'user_profiles', userId)).catch(() => null),
+            getDocs(query(collection(db, 'reports'), where('userId', '==', userId))).catch(() => null),
+          ]).then(([profileSnapshot, reportsSnapshot]) => {
+            const reportName = reportsSnapshot?.docs
+              .map((reportDoc) => reportDoc.data())
+              .map((reportData) => reportData.reporterName || reportData.userName || reportData.reporter)
+              .map(adoptionUserName)
+              .find((name): name is string => Boolean(name))
+            const profileName = [
+              profileSnapshot?.data()?.fullName,
+              profileSnapshot?.data()?.displayName,
+              reportName,
+            ].map(adoptionUserName).find((name): name is string => Boolean(name))
+            if (!profileName) return
+            setCandidates((current) => current.map((candidate) => (
+              candidate.id === applicationId
+                ? { ...candidate, name: profileName }
+                : candidate
+            )))
+          }).catch(() => {
+            // O contador e a candidatura continuam disponíveis mesmo sem o nome.
+          })
+        })
+
+        const baseConversations = conversationDocs.map((conversationDoc) => {
+          const data = conversationDoc.data()
+          const userDocument = conversationDoc.ref.parent.parent
+          return {
+            id: `${userDocument?.id ?? 'user'}:${conversationDoc.id}`,
+            userId: userDocument?.id ?? '',
+            animalId: conversationDoc.id,
+            userName: adoptionUserName(data.userName) ?? 'Usuário interessado',
+            animalName: 'Animal',
+            lastMessage: '',
+            lastMessageTime: 'Agora',
+            unread: 0,
+            messages: [],
+          } satisfies AdoptionConversation
+        })
+        setAdoptionConversations(baseConversations)
+
+        // Conversas antigas podem não ter userName salvo ainda. Resolva o nome
+        // também a partir dos dados que já existem no Firebase, para não
+        // depender de uma nova mensagem criada depois deste ajuste.
+        conversationDocs.forEach((conversationDoc) => {
+          const userId = conversationDoc.ref.parent.parent?.id
+          const data = conversationDoc.data()
+          if (!userId || adoptionUserName(data.userName)) return
+          const conversationId = `${userId}:${conversationDoc.id}`
+          void Promise.all([
+            getDoc(doc(db, 'user_profiles', userId)).catch(() => null),
+            getDoc(doc(db, 'adoption_applications', userId, 'animals', conversationDoc.id)).catch(() => null),
+            getDocs(query(collection(db, 'reports'), where('userId', '==', userId))).catch(() => null),
+          ]).then(([profileSnapshot, applicationSnapshot, reportsSnapshot]) => {
+            const profileData = profileSnapshot?.data()
+            const applicationData = applicationSnapshot?.data()
+            const applicationProfile = applicationData?.profile
+            const reportName = reportsSnapshot?.docs
+              .map((reportDoc) => reportDoc.data())
+              .map((reportData) => reportData.reporterName || reportData.userName || reportData.reporter)
+              .map(adoptionUserName)
+              .find((name): name is string => Boolean(name))
+            const profileName = [
+              profileData?.fullName,
+              profileData?.displayName,
+              applicationData?.userName,
+              applicationData?.fullName,
+              applicationProfile?.fullName,
+              applicationProfile?.name,
+              reportName,
+            ].map(adoptionUserName).find((name): name is string => Boolean(name))
+
+            if (typeof profileName !== 'string' || !profileName.trim()) return
+            setAdoptionConversations((current) => current.map((conversation) => (
+              conversation.id === conversationId
+                ? { ...conversation, userName: profileName.trim() }
+                : conversation
+            )))
+          })
+        })
+
+        messageUnsubscribers = conversationDocs.map((conversationDoc) => {
+          const userId = conversationDoc.ref.parent.parent?.id ?? ''
+          const conversationId = `${userId}:${conversationDoc.id}`
+          return onSnapshot(collection(conversationDoc.ref, 'messages'), (messageSnapshot) => {
+            const messages = messageSnapshot.docs
+              .map((messageDoc) => {
+                const data = messageDoc.data()
+                const createdAt = data.createdAt?.toDate?.() as Date | undefined
+                return {
+                  id: messageDoc.id,
+                  text: typeof data.text === 'string' ? data.text : '',
+                  senderRole: data.senderRole === 'team' ? 'team' as const : 'user' as const,
+                  senderName: typeof data.senderName === 'string' ? data.senderName : undefined,
+                  timestamp: createdAt
+                    ? createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                    : 'Agora',
+                  createdAtMillis: createdAt?.getTime() ?? 0,
+                }
+              })
+              .filter((message) => message.text.trim())
+              .sort((a, b) => a.createdAtMillis - b.createdAtMillis)
+              .map(({ createdAtMillis: _createdAtMillis, ...message }) => message)
+            const lastMessage = messages[messages.length - 1]
+            const userMessages = messages.filter((message) => message.senderRole === 'user')
+            const messageUserName = userMessages
+              .map((message) => adoptionUserName(message.senderName))
+              .find((name): name is string => Boolean(name))
+
+            setAdoptionConversations((current) => current.map((conversation) => (
+              conversation.id === conversationId
+                ? {
+                    ...conversation,
+                    userName: messageUserName || conversation.userName,
+                    lastMessage: lastMessage?.text || '',
+                    lastMessageTime: lastMessage?.timestamp || conversation.lastMessageTime,
+                    unread: userMessages.length,
+                    messages,
+                  }
+                : conversation
+            )))
+            if (messageUserName) {
+              setCandidates((current) => current.map((candidate) => (
+                candidate.id === `adoption:${userId}:${conversationDoc.id}`
+                  ? { ...candidate, name: messageUserName }
+                  : candidate
+              )))
+            }
+          })
+        })
+      },
+      (error) => {
+        console.error('Erro ao carregar conversas de adoção:', error)
+        setAdoptionConversations([])
+        setAdoptionConversationsError(
+          error.code === 'permission-denied'
+            ? 'A conta da ONG não tem permissão para ler esta conversa. Publique as regras atualizadas e confirme se o UID da ONG é o mesmo do campo ong_id do animal.'
+            : 'Tente atualizar a página e carregar novamente.',
+        )
+      },
+    )
+
+    let remotePosts: CommunityPost[] = []
+    let remoteCampaigns: CommunityPost[] = []
+    let remoteComments: Record<string, PostComment[]> = {}
+    let remoteLikes: Record<string, boolean> = {}
+    const commentUnsubscribers = new Map<string, () => void>()
+    const likeUnsubscribers = new Map<string, () => void>()
+    const campaignAnimalUnsubscribers = new Map<string, () => void>()
+    const publishCommunitySnapshot = () => {
+      setPosts(
+        [...remotePosts, ...remoteCampaigns].map((post) => post.type === 'Post'
+          ? {
+              ...post,
+              likedByCurrentUser: remoteLikes[post.id] ?? false,
+              commentsList: remoteComments[post.id] ?? [],
+            }
+          : post).sort((left, right) => {
+          return (right.createdAtMillis ?? 0) - (left.createdAtMillis ?? 0)
+        }),
+      )
+    }
+
+    const syncPostCommentListeners = () => {
+      const postIds = new Set(remotePosts.map((post) => post.id))
+
+      for (const [postId, unsubscribe] of commentUnsubscribers) {
+        if (!postIds.has(postId)) {
+          unsubscribe()
+          commentUnsubscribers.delete(postId)
+          delete remoteComments[postId]
+        }
+      }
+
+      for (const postId of postIds) {
+        if (commentUnsubscribers.has(postId)) continue
+
+        const commentsQuery = query(
+          collection(db, 'community_posts', postId, 'comments'),
+          orderBy('createdAt', 'asc'),
+        )
+        const unsubscribe = onSnapshot(
+          commentsQuery,
+          (snapshot) => {
+            remoteComments[postId] = snapshot.docs
+              .map((commentDoc) => {
+                const data = commentDoc.data()
+                return {
+                  id: commentDoc.id,
+                  author: String(data.authorName ?? 'Membro da comunidade'),
+                  authorId: typeof data.authorId === 'string' ? data.authorId : undefined,
+                  text: String(data.text ?? '').trim(),
+                  timeAgo: communityElapsed(data.createdAt),
+                  parentCommentId: typeof data.parentCommentId === 'string'
+                    ? data.parentCommentId
+                    : undefined,
+                }
+              })
+              .filter((comment) => comment.text.length > 0)
+            publishCommunitySnapshot()
+          },
+          (error) => {
+            console.error(`Erro ao carregar comentários da publicação ${postId}:`, error)
+            remoteComments[postId] = []
+            publishCommunitySnapshot()
+          },
+        )
+        commentUnsubscribers.set(postId, unsubscribe)
+      }
+
+      publishCommunitySnapshot()
+    }
+
+    const syncCampaignAnimalListeners = () => {
+      const adoptionCampaignIds = new Set(
+        remoteCampaigns
+          .filter((post) => post.categoryLabel === 'Adoção')
+          .map((post) => post.id),
+      )
+
+      for (const [campaignId, unsubscribe] of campaignAnimalUnsubscribers) {
+        if (!adoptionCampaignIds.has(campaignId)) {
+          unsubscribe()
+          campaignAnimalUnsubscribers.delete(campaignId)
+        }
+      }
+
+      for (const campaignId of adoptionCampaignIds) {
+        if (campaignAnimalUnsubscribers.has(campaignId)) continue
+
+        const unsubscribe = onSnapshot(
+          collection(db, 'community_campaigns', campaignId, 'animals'),
+          (snapshot) => {
+            const confirmedAnimals = snapshot.docs.map((animalDoc) => {
+              const animal = animalDoc.data()
+              return {
+                id: animalDoc.id,
+                name: String(animal.name ?? ''),
+                breed: String(animal.breed ?? ''),
+                ageText: String(animal.ageText ?? ''),
+                photoUrl: communityPhotoUrl(animal.photoData),
+              }
+            }).filter((animal) => animal.name.trim())
+
+            remoteCampaigns = remoteCampaigns.map((post) => (
+              post.id === campaignId
+                ? { ...post, campaign: { ...post.campaign, confirmedAnimals } }
+                : post
+            ))
+            publishCommunitySnapshot()
+          },
+          (error) => {
+            console.error(`Erro ao carregar animais confirmados da campanha ${campaignId}:`, error)
+          },
+        )
+        campaignAnimalUnsubscribers.set(campaignId, unsubscribe)
+      }
+    }
+
+    const syncPostLikeListeners = () => {
+      const postIds = new Set(remotePosts.map((post) => post.id))
+
+      for (const [postId, unsubscribe] of likeUnsubscribers) {
+        if (!postIds.has(postId)) {
+          unsubscribe()
+          likeUnsubscribers.delete(postId)
+          delete remoteLikes[postId]
+        }
+      }
+
+      for (const postId of postIds) {
+        if (likeUnsubscribers.has(postId)) continue
+
+        const unsubscribe = onSnapshot(
+          doc(db, 'community_posts', postId, 'likes', user.uid),
+          (snapshot) => {
+            remoteLikes[postId] = snapshot.exists()
+            publishCommunitySnapshot()
+          },
+          (error) => {
+            console.error(`Erro ao carregar curtida da publicação ${postId}:`, error)
+            remoteLikes[postId] = false
+            publishCommunitySnapshot()
+          },
+        )
+        likeUnsubscribers.set(postId, unsubscribe)
+      }
+
+      publishCommunitySnapshot()
+    }
+
+    const unsubscribePosts = onSnapshot(
+      collection(db, 'community_posts'),
+      (snapshot) => {
+        remotePosts = snapshot.docs
+          .map((postDoc) => mapCommunityPostDocument(postDoc.id, postDoc.data(), user.uid))
+          .filter((post): post is CommunityPost => Boolean(post))
+        syncPostCommentListeners()
+        syncPostLikeListeners()
+      },
+      (error) => console.error('Erro ao carregar publicações da comunidade:', error),
+    )
+
+    const unsubscribeCampaigns = onSnapshot(
+      collection(db, 'community_campaigns'),
+      async (snapshot) => {
+        const mappedCampaigns = snapshot.docs
+          .map((campaignDoc) => mapCommunityCampaignDocument(campaignDoc.id, campaignDoc.data(), user.uid))
+          .filter((post): post is CommunityPost => Boolean(post))
+
+        remoteCampaigns = await Promise.all(mappedCampaigns.map(async (post) => {
+          try {
+            const animalSnapshot = await getDocs(
+              collection(db, 'community_campaigns', post.id, 'animals'),
+            )
+            const confirmedAnimals = animalSnapshot.docs.map((animalDoc) => {
+              const animal = animalDoc.data()
+              return {
+                id: animalDoc.id,
+                name: String(animal.name ?? ''),
+                breed: String(animal.breed ?? ''),
+                ageText: String(animal.ageText ?? ''),
+                photoUrl: communityPhotoUrl(animal.photoData),
+              }
+            }).filter((animal) => animal.name.trim())
+            return {
+              ...post,
+              campaign: { ...post.campaign, confirmedAnimals },
+            }
+          } catch (error) {
+            console.error(`Erro ao carregar animais confirmados da campanha ${post.id}:`, error)
+            return post
+          }
         }))
+        syncCampaignAnimalListeners()
+        publishCommunitySnapshot()
+      },
+      (error) => console.error('Erro ao carregar campanhas da comunidade:', error),
+    )
+
+    const hydrateOrganizationProfile = async (organizationData: Record<string, any>) => {
+      const versionAtStart = profileWriteVersion.current
+      let verificationData: Record<string, any> = {}
+      let mappedCnpj = ''
+
+      try {
+        const [verificationSnapshot, mappingSnapshot] = await Promise.all([
+          getDocs(query(
+            collection(db, 'organization_verification_requests'),
+            where('requesterId', '==', user.uid),
+            limit(1),
+          )),
+          user.email
+            ? getDocs(query(
+                collection(db, 'cnpj_mapping'),
+                where('email', '==', user.email),
+                limit(1),
+              ))
+            : Promise.resolve(null),
+        ])
+
+        verificationData = verificationSnapshot.docs[0]?.data() ?? {}
+        const mappingDocument = mappingSnapshot?.docs[0]
+        if (mappingDocument) mappedCnpj = formatOrganizationIdentifier(mappingDocument.id)
+      } catch (error) {
+        console.warn('Não foi possível carregar os dados complementares da ONG:', error)
       }
-    })
+
+      if (profileWriteVersion.current !== versionAtStart) return
+
+      const organizationCnpj = String(organizationData.cnpj ?? '').trim()
+      const cnpj = organizationCnpj && !/^0{2}[.\d/\-]*$/.test(organizationCnpj)
+        ? organizationCnpj
+        : String(verificationData.cnpj || mappedCnpj || organizationCnpj)
+
+      setProfile((prev) => ({
+        ...prev,
+        name: organizationData.name ?? verificationData.legalName ?? prev.name,
+        cnpj: normalizeOrganizationCnpj(cnpj || prev.cnpj),
+        email: organizationData.institutionalEmail
+          ?? organizationData.email
+          ?? verificationData.institutionalEmail
+          ?? user.email
+          ?? prev.email,
+        pixKey: organizationData.pixKey ?? verificationData.pixKey ?? prev.pixKey,
+        responsibleName: organizationData.responsibleName ?? verificationData.responsibleName ?? prev.responsibleName,
+        isVerified: organizationData.isVerified ?? prev.isVerified,
+        verifiedAt: organizationData.verifiedAt ?? prev.verifiedAt,
+      }))
+    }
+
+    const unsubscribeOrg = onSnapshot(
+      doc(db, 'organizations', user.uid),
+      (docSnap) => {
+        void hydrateOrganizationProfile(docSnap.exists() ? docSnap.data() : {})
+      },
+      (error) => console.error('Erro ao carregar o perfil institucional:', error),
+    )
 
     return () => {
       unsubscribeReports()
       unsubscribeAnimals()
-      unsubscribeCandidates()
+      unsubscribeAdoptionConversations()
+      messageUnsubscribers.forEach((unsubscribe) => unsubscribe())
+      checkInUnsubscribers.forEach((unsubscribe) => unsubscribe())
       unsubscribePosts()
-      unsubscribeCheckIns()
+      unsubscribeCampaigns()
+      commentUnsubscribers.forEach((unsubscribe) => unsubscribe())
+      likeUnsubscribers.forEach((unsubscribe) => unsubscribe())
+      campaignAnimalUnsubscribers.forEach((unsubscribe) => unsubscribe())
       unsubscribeOrg()
     }
   }, [user.uid])
@@ -1133,10 +2118,6 @@ function OrganizationDashboard({
   }, [candidates])
 
   useEffect(() => {
-    localStorage.setItem('weanimals_posts', JSON.stringify(posts))
-  }, [posts])
-
-  useEffect(() => {
     localStorage.setItem('weanimals_checkins', JSON.stringify(checkIns))
   }, [checkIns])
 
@@ -1149,7 +2130,6 @@ function OrganizationDashboard({
     localStorage.removeItem('weanimals_reports')
     localStorage.removeItem('weanimals_animals')
     localStorage.removeItem('weanimals_candidates')
-    localStorage.removeItem('weanimals_posts')
     localStorage.removeItem('weanimals_checkins')
     onLogout()
   }
@@ -1259,24 +2239,73 @@ function OrganizationDashboard({
     }
   }
 
+  async function handleSendAdoptionMessage(conversationId: string, text: string) {
+    const conversation = adoptionConversations.find((item) => item.id === conversationId)
+    if (!conversation) return
+
+    await addDoc(
+      collection(db, 'adoption_conversations', conversation.userId, 'animals', conversation.animalId, 'messages'),
+      {
+        senderId: user.uid,
+        senderRole: 'team',
+        senderName: profile.name,
+        text: text.trim(),
+        createdAt: serverTimestamp(),
+      },
+    )
+    pushNotification(
+      'Mensagem enviada',
+      `Mensagem enviada ao interessado em ${conversation.animalName || 'um animal'}.`,
+      'animals',
+      'adoption',
+    )
+  }
+
   async function handleAddAnimal(newAnimal: Omit<AnimalItem, 'id'>) {
     const tempId = `ani-${Date.now()}`
-    const animalWithId: AnimalItem = { id: tempId, ...newAnimal }
-
-    setAnimals((prev) => [animalWithId, ...prev])
-    setSelectedAnimalId(tempId)
-    pushNotification('Novo Animal', `${newAnimal.name} foi cadastrado para adoção.`, 'animals', 'adoption')
-
     try {
-      await setDoc(doc(db, 'animals', tempId), animalWithId)
+      const compatibility = newAnimal.compatibility ?? []
+      const traits = newAnimal.traits ?? []
+      const photos = newAnimal.photos ?? []
+      await setDoc(doc(db, 'animais', tempId), {
+        nome: newAnimal.name,
+        ong_id: user.uid,
+        abrigo_nome: profile.name,
+        abrigo_endereco: '',
+        especie: adoptionSpeciesValue(newAnimal.species),
+        raca: newAnimal.breed ?? '',
+        idade_texto: newAnimal.ageText ?? '',
+        idade_anos: ageYearsFromText(newAnimal.ageText),
+        porte: newAnimal.size,
+        foto_url: photos[0] ?? '',
+        foto_urls: photos,
+        caracteristicas: traits,
+        vacinado: traits.some((trait) => trait.toLowerCase().includes('vacin')),
+        castrado: traits.some((trait) => trait.toLowerCase().includes('castrad')),
+        bom_com_criancas: compatibility.includes('Bom com crianças'),
+        bom_com_outros_animais: compatibility.some((item) =>
+          item === 'Bom com outros cães' || item === 'Bom com gatos' || item === 'Bom com outros animais',
+        ),
+        convivencia: compatibility,
+        nivel_energia: compatibility.includes('Energia moderada') ? 'moderada' :
+          compatibility.includes('Energia alta') ? 'alta' :
+            compatibility.includes('Energia tranquila') || compatibility.includes('Calmo em casa') ? 'baixa' : null,
+        descricao: newAnimal.about ?? '',
+        requisitos_adocao: newAnimal.requirements ?? [],
+        chegada_ao_abrigo: newAnimal.arrivalDate,
+        status: 'disponivel',
+        criado_em: serverTimestamp(),
+      })
+      setSelectedAnimalId(tempId)
+      pushNotification('Novo Animal', `${newAnimal.name} foi cadastrado para adoção.`, 'animals', 'adoption')
     } catch (error) {
       console.error('Erro ao adicionar animal no Firebase:', error)
+      throw error
     }
   }
 
   async function handleUpdateCandidateStatus(candidateId: string, status: CandidateStatus, justificationText?: string) {
     let updatedCandidate: Candidate | undefined
-    let generatedCheckIn: CheckInRecord | undefined
 
     setCandidates((prev) =>
       prev.map((c) => {
@@ -1286,134 +2315,385 @@ function OrganizationDashboard({
             status,
             ...(justificationText ? { justification: justificationText } : {}),
           }
-          if (status === 'aprovado') {
-            const animalObj = animals.find((a) => a.id === c.animalId)
-            generatedCheckIn = {
-              id: `chk-${Date.now()}`,
-              animal: animalObj ? animalObj.name : 'Pet',
-              adopter: c.name,
-              currentDays: 30,
-              status: 'Ótima',
-              reviewed: false,
-              reportsByPeriod: {
-                30: [{ label: 'Adaptação inicial (30d)', value: 'Adoção recém-aprovada' }],
-                90: [{ label: 'Status (90d)', value: 'Aguardando prazo' }],
-                180: [{ label: 'Status (180d)', value: 'Aguardando prazo' }],
-              },
-            }
-          }
           return updatedCandidate
         }
         return c
       }),
     )
 
-    if (generatedCheckIn) {
-      const checkInToSave = generatedCheckIn
-      setCheckIns((chkPrev) => [checkInToSave, ...chkPrev])
-      pushNotification('Adoção Aprovada!', `Check-in de 30 dias gerado para ${checkInToSave.adopter}.`, 'checkins', 'checkin')
-    }
-
     try {
       if (updatedCandidate) {
         await setDoc(doc(db, 'candidates', candidateId), updatedCandidate, { merge: true })
-      }
-      if (generatedCheckIn) {
-        await setDoc(doc(db, 'checkins', generatedCheckIn.id), generatedCheckIn)
       }
     } catch (error) {
       console.error('Erro ao atualizar candidato no Firebase:', error)
     }
   }
 
-  async function handleSaveCommunityPost(postData: any) {
-    if (postData.id) {
-      let updatedPost: CommunityPost | undefined
-      setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id === postData.id) {
-            updatedPost = {
-              ...p,
-              title: postData.title,
-              type: postData.type,
-              categoryLabel: postData.categoryLabel,
-              description: postData.description,
-              progressText: postData.progressText,
-            }
-            return updatedPost
-          }
-          return p
-        }),
-      )
-      try {
-        if (updatedPost) {
-          await setDoc(doc(db, 'posts', postData.id), updatedPost, { merge: true })
-        }
-      } catch (error) {
-        console.error('Erro ao editar post no Firebase:', error)
-      }
-    } else {
-      const newPost: CommunityPost = {
-        id: `post-${Date.now()}`,
-        author: profile.name,
-        isOwn: true,
-        type: postData.type,
-        categoryLabel: postData.categoryLabel,
-        title: postData.title,
-        description: postData.description,
-        progressText: postData.progressText,
-        progressPct: 10,
-        subscribers: [],
-        likes: 0,
-        commentsList: [],
-        elapsed: 'agora',
-      }
-      setPosts((prev) => [newPost, ...prev])
-      pushNotification('Nova Campanha', `"${postData.title}" foi publicada na comunidade.`, 'community', 'info')
+  async function handleUpdateAdoptionApplicationStatus(
+    candidateId: string,
+    status: AdoptionApplicationStatus,
+  ) {
+    const candidate = candidates.find((item) => item.id === candidateId)
+    if (!candidate?.userId) return
 
-      try {
-        await setDoc(doc(db, 'posts', newPost.id), newPost)
-      } catch (error) {
-        console.error('Erro ao criar post no Firebase:', error)
+    const currentStatus = candidate.applicationStatus ?? 'pending'
+    const currentRank = adoptionApplicationStatusRank(currentStatus)
+    const nextRank = adoptionApplicationStatusRank(status)
+    const canReject = currentStatus === 'pending' || currentStatus === 'reviewing'
+    const canAdvance = status === 'rejected'
+      ? canReject
+      : nextRank > currentRank
+
+    if (!canAdvance) {
+      pushNotification(
+        'Status não alterado',
+        'A candidatura não pode voltar para uma etapa anterior.',
+        'animals',
+        'adoption',
+      )
+      return
+    }
+
+    setCandidates((current) => current.map((item) => (
+      item.id === candidateId
+        ? {
+            ...item,
+            applicationStatus: status,
+            status: status === 'rejected' || status === 'cancelled' ? 'recusado' :
+              status === 'approved' || status === 'visit_scheduled' || status === 'adopted' ? 'aprovado' :
+                'pendente',
+          }
+        : item
+    )))
+
+    try {
+      const updateData: Record<string, unknown> = {
+        status,
+        updatedAt: serverTimestamp(),
       }
+      if (status === 'adopted') updateData.adoptedAt = serverTimestamp()
+      const statusBatch = writeBatch(db)
+      statusBatch.update(
+        doc(db, 'adoption_applications', candidate.userId, 'animals', candidate.animalId),
+        updateData,
+      )
+      if (status === 'approved' || status === 'visit_scheduled' || status === 'adopted') {
+        statusBatch.update(doc(db, 'animais', candidate.animalId), {
+          status: 'reservado',
+        })
+      }
+      await statusBatch.commit()
+      const statusLabel = {
+        pending: 'aguardando análise',
+        reviewing: 'em análise',
+        approved: 'aprovada',
+        rejected: 'recusada',
+        visit_scheduled: 'visita agendada',
+        adopted: 'adoção confirmada',
+        cancelled: 'cancelada',
+      }[status]
+      pushNotification(
+        'Candidatura atualizada',
+        `A candidatura de ${candidate.name} foi marcada como ${statusLabel}.`,
+        'animals',
+        'adoption',
+      )
+    } catch (error) {
+      console.error('Erro ao atualizar candidatura de adoção:', error)
+    }
+  }
+
+  async function handleSaveCommunityPost(postData: CommunityPostInput) {
+    if (postData.id) {
+      try {
+        if (postData.type === 'Campanha') {
+          const category = {
+            Castração: 'NEUTERING',
+            Vacinação: 'VACCINATION',
+            Adoção: 'ADOPTION',
+            Doação: 'DONATION',
+          }[postData.categoryLabel] ?? 'OTHER'
+          const campaign = postData.campaign ?? {}
+          const locationText = [campaign.location?.name, campaign.location?.address]
+            .map((value) => value?.trim())
+            .filter(Boolean)
+            .join(' — ') || 'Região da organização'
+          const dateText = [campaign.startsAt, campaign.endsAt]
+            .map((value) => value ? new Date(value).toLocaleString('pt-BR') : '')
+            .filter(Boolean)
+            .join(' · ') || 'Data a definir'
+          const capacity = typeof campaign.capacity === 'number' && campaign.capacity > 0
+            ? Math.floor(campaign.capacity)
+            : undefined
+          const updateData: Record<string, any> = {
+            category,
+            title: postData.title.trim(),
+            dateText,
+            startsAt: campaign.startsAt || deleteField(),
+            endsAt: campaign.endsAt || deleteField(),
+            locationText: locationText.slice(0, 160),
+            locationLabel: (campaign.location?.name || campaign.location?.address || profile.name).slice(0, 80),
+            availabilityText: capacity
+              ? `0 de ${capacity} vagas`
+              : campaign.confirmedAnimals?.length
+                ? `${campaign.confirmedAnimals.length} animais confirmados`
+                : 'Sem limite de vagas',
+            audienceText: campaign.animalAudience?.trim() || '',
+            description: postData.description.trim(),
+            highlightText: '',
+            photoData: communityPhotoBytes(postData.imageUrls?.[0] ?? postData.imageUrl) ?? deleteField(),
+            totalSlots: capacity ?? deleteField(),
+          }
+          if (category === 'DONATION') {
+            const goal = typeof campaign.donation?.goalAmount === 'number' && campaign.donation.goalAmount > 0
+              ? Math.round(campaign.donation.goalAmount * 100)
+              : undefined
+            updateData.donationGoalCents = goal ?? deleteField()
+            updateData.donationNeeds = campaign.donation?.neededItems ?? []
+            updateData.pixKey = profile.pixKey || ''
+          }
+          await updateDoc(doc(db, 'community_campaigns', postData.id), updateData)
+          await syncCommunityCampaignAnimals(postData.id, campaign.confirmedAnimals ?? [])
+        } else {
+          const category = {
+            Achados: 'FOUND',
+            Dúvida: 'QUESTION',
+            Aviso: 'NOTICE',
+            Outro: 'OTHER',
+          }[postData.postCategory ?? postData.categoryLabel] ?? 'OTHER'
+          const updateData: Record<string, any> = {
+            category,
+            body: postData.description.trim().slice(0, 1000),
+            locationLabel: [postData.location?.name, postData.location?.address]
+              .map((value) => value?.trim())
+              .filter(Boolean)
+              .join(' — ')
+              .slice(0, 80) || profile.name.slice(0, 80),
+            photoData: communityPhotoBytes(postData.imageUrls?.[0] ?? postData.imageUrl) ?? deleteField(),
+          }
+          await updateDoc(doc(db, 'community_posts', postData.id), updateData)
+        }
+
+        setPosts((prev) =>
+          prev.map((p) => {
+            if (p.id === postData.id) {
+              return {
+                ...p,
+                title: postData.title,
+                type: postData.type,
+                categoryLabel: postData.categoryLabel,
+                description: postData.description,
+                progressText: postData.progressText,
+                progressPct: postData.progressPct,
+                campaign: postData.campaign,
+                postCategory: postData.postCategory,
+                imageUrl: postData.imageUrl,
+                imageUrls: postData.imageUrls,
+                location: postData.location,
+                postDetails: postData.postDetails,
+              }
+            }
+            return p
+          }),
+        )
+        return true
+      } catch (error) {
+        console.error('Erro ao atualizar publicação da Comunidade:', error)
+        return false
+      }
+    }
+
+    const isCampaign = postData.type === 'Campanha'
+    const collectionName = isCampaign ? 'community_campaigns' : 'community_posts'
+    const reference = doc(collection(db, collectionName))
+
+    try {
+      if (isCampaign) {
+        const category = {
+          Castração: 'NEUTERING',
+          Vacinação: 'VACCINATION',
+          Adoção: 'ADOPTION',
+          Doação: 'DONATION',
+        }[postData.categoryLabel] ?? 'OTHER'
+        const campaign = postData.campaign ?? {}
+        const locationText = [campaign.location?.name, campaign.location?.address]
+          .map((value) => value?.trim())
+          .filter(Boolean)
+          .join(' — ') || 'Região da organização'
+        const dateText = [campaign.startsAt, campaign.endsAt]
+          .map((value) => value ? new Date(value).toLocaleString('pt-BR') : '')
+          .filter(Boolean)
+          .join(' · ') || 'Data a definir'
+        const capacity = typeof campaign.capacity === 'number' && campaign.capacity > 0
+          ? Math.floor(campaign.capacity)
+          : undefined
+        const remoteCampaign: Record<string, any> = {
+          organizationId: user.uid,
+          organizationName: profile.name,
+          createdBy: user.uid,
+          category,
+          title: postData.title.trim(),
+          dateText,
+          locationText: locationText.slice(0, 160),
+          locationLabel: (campaign.location?.name || campaign.location?.address || profile.name).slice(0, 80),
+          availabilityText: capacity
+            ? `0 de ${capacity} vagas`
+            : campaign.confirmedAnimals?.length
+              ? `${campaign.confirmedAnimals.length} animais confirmados`
+              : 'Sem limite de vagas',
+          audienceText: campaign.animalAudience?.trim() || '',
+          description: postData.description.trim(),
+          highlightText: '',
+          createdAt: serverTimestamp(),
+        }
+        const photoData = communityPhotoBytes(postData.imageUrls?.[0] ?? postData.imageUrl)
+        if (photoData) remoteCampaign.photoData = photoData
+        if (campaign.startsAt) remoteCampaign.startsAt = campaign.startsAt
+        if (campaign.endsAt) remoteCampaign.endsAt = campaign.endsAt
+        if (capacity) {
+          remoteCampaign.totalSlots = capacity
+          remoteCampaign.filledSlots = 0
+        }
+        if (category === 'DONATION') {
+          const goal = typeof campaign.donation?.goalAmount === 'number' && campaign.donation.goalAmount > 0
+            ? Math.round(campaign.donation.goalAmount * 100)
+            : undefined
+          if (goal) {
+            remoteCampaign.donationGoalCents = goal
+            remoteCampaign.donationRaisedCents = 0
+          }
+          remoteCampaign.donationNeeds = campaign.donation?.neededItems ?? []
+          remoteCampaign.pixKey = profile.pixKey || ''
+        }
+        await setDoc(reference, remoteCampaign)
+        await syncCommunityCampaignAnimals(reference.id, campaign.confirmedAnimals ?? [])
+      } else {
+        const category = {
+          Achados: 'FOUND',
+          Dúvida: 'QUESTION',
+          Aviso: 'NOTICE',
+          Outro: 'OTHER',
+        }[postData.postCategory ?? postData.categoryLabel] ?? 'OTHER'
+        const remotePost: Record<string, any> = {
+          authorId: user.uid,
+          authorName: profile.name,
+          category,
+          body: postData.description.trim().slice(0, 1000),
+          locationLabel: [postData.location?.name, postData.location?.address]
+            .map((value) => value?.trim())
+            .filter(Boolean)
+            .join(' — ')
+            .slice(0, 80) || profile.name.slice(0, 80),
+          likesCount: 0,
+          commentsCount: 0,
+          createdAt: serverTimestamp(),
+        }
+        const photoData = communityPhotoBytes(postData.imageUrls?.[0] ?? postData.imageUrl)
+        if (photoData) remotePost.photoData = photoData
+        await setDoc(reference, remotePost)
+      }
+      pushNotification(
+        isCampaign ? 'Nova campanha' : 'Nova publicação',
+        `"${postData.title || 'Comunidade'}" foi publicada e já está disponível para a rede.`,
+        'community',
+        'info',
+      )
+      return true
+    } catch (error) {
+      console.error('Erro ao publicar na Comunidade:', error)
+      if (isCampaign) {
+        // Avoid leaving an adoption campaign without its confirmed-animal list
+        // when the nested write is rejected by Firestore rules.
+        await deleteDoc(reference).catch(() => undefined)
+      }
+      return false
     }
   }
 
   async function handleDeleteCommunityPost(id: string) {
     setPosts((prev) => prev.filter((p) => p.id !== id))
     try {
-      await deleteDoc(doc(db, 'posts', id))
+      const post = posts.find((item) => item.id === id)
+      await deleteDoc(doc(db, post?.type === 'Campanha' ? 'community_campaigns' : 'community_posts', id))
     } catch (error) {
-      console.error('Erro ao excluir post no Firebase:', error)
+      console.error('Erro ao excluir publicação da Comunidade:', error)
     }
   }
 
   async function handleLikeCommunityPost(id: string) {
-    let updatedPost: CommunityPost | undefined
+    const currentPost = posts.find((post) => post.id === id)
+    if (!currentPost) return
+    const currentLiked = Boolean(currentPost.likedByCurrentUser)
+    let nextLiked = currentLiked
+    let nextLikes = currentPost.likes ?? 0
+
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === id) {
-          updatedPost = { ...p, likes: (p.likes ?? 0) + 1 }
-          return updatedPost
+          return {
+            ...p,
+            likes: Math.max(0, (p.likes ?? 0) + (currentLiked ? -1 : 1)),
+            likedByCurrentUser: !currentLiked,
+          }
         }
         return p
       }),
     )
+
     try {
-      if (updatedPost) {
-        await setDoc(doc(db, 'posts', id), updatedPost, { merge: true })
-      }
+      await runTransaction(db, async (transaction) => {
+        const postReference = doc(db, 'community_posts', id)
+        const likeReference = doc(db, 'community_posts', id, 'likes', user.uid)
+        const postSnapshot = await transaction.get(postReference)
+        const likeSnapshot = await transaction.get(likeReference)
+        const likesCount = Number(postSnapshot.data()?.likesCount ?? 0)
+
+        nextLiked = !likeSnapshot.exists()
+        nextLikes = Math.max(0, likesCount + (nextLiked ? 1 : -1))
+        if (nextLiked) {
+          transaction.set(likeReference, {
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+          })
+        } else {
+          transaction.delete(likeReference)
+        }
+        transaction.update(postReference, {
+          likesCount: nextLikes,
+          commentsCount: Number(postSnapshot.data()?.commentsCount ?? 0),
+        })
+      })
+
+      setPosts((prev) => prev.map((post) => (
+        post.id === id
+          ? { ...post, likes: nextLikes, likedByCurrentUser: nextLiked }
+          : post
+      )))
     } catch (error) {
-      console.error('Erro ao curtir post no Firebase:', error)
+      console.error('Erro ao curtir publicação da Comunidade:', error)
+      setPosts((prev) => prev.map((post) => (
+        post.id === id
+          ? { ...post, likes: currentPost.likes, likedByCurrentUser: currentLiked }
+          : post
+      )))
     }
   }
 
-  async function handleAddPostComment(postId: string, text: string) {
+  async function handleAddPostComment(
+    postId: string,
+    text: string,
+    parentCommentId?: string,
+    mentionedUserIds: string[] = [],
+  ) {
+    const post = posts.find((item) => item.id === postId)
     const newComment = {
       id: `c-${Date.now()}`,
       author: profile.name,
+      authorId: user.uid,
       text,
       timeAgo: 'agora',
+      parentCommentId,
     }
     let updatedPost: CommunityPost | undefined
 
@@ -1432,42 +2712,43 @@ function OrganizationDashboard({
 
     try {
       if (updatedPost) {
-        await setDoc(doc(db, 'posts', postId), updatedPost, { merge: true })
+        const commentReference = await addDoc(collection(db, 'community_posts', postId, 'comments'), {
+          authorId: user.uid,
+          authorName: profile.name,
+          text,
+          createdAt: serverTimestamp(),
+          ...(parentCommentId ? { parentCommentId } : {}),
+        })
+        await updateDoc(doc(db, 'community_posts', postId), {
+          commentsCount: increment(1),
+        })
+
+        const parentAuthorId = parentCommentId
+          ? post?.commentsList?.find((item) => item.id === parentCommentId)?.authorId
+          : undefined
+        const recipientIds = Array.from(new Set([
+          ...mentionedUserIds,
+          parentAuthorId,
+        ].filter((recipientId): recipientId is string => Boolean(recipientId && recipientId !== user.uid))))
+
+        await Promise.all(recipientIds.map((recipientId) =>
+          addDoc(collection(db, 'community_notifications'), {
+            recipientId,
+            actorId: user.uid,
+            actorName: profile.name,
+            postId,
+            commentId: commentReference.id,
+            type: 'community_mention',
+            message: `${profile.name} mencionou você na Comunidade.`,
+            read: false,
+            createdAt: serverTimestamp(),
+          }).catch((notificationError) => {
+            console.error('Não foi possível criar a notificação da Comunidade:', notificationError)
+          }),
+        ))
       }
     } catch (error) {
-      console.error('Erro ao comentar post no Firebase:', error)
-    }
-  }
-
-  async function handleAddCampaignSubscriber(postId: string, subscriber: { name: string; contact: string; detail: string }) {
-    const newSub = {
-      id: `sub-${Date.now()}`,
-      name: subscriber.name,
-      contact: subscriber.contact,
-      detail: subscriber.detail,
-      status: 'Confirmado',
-    }
-    let updatedPost: CommunityPost | undefined
-
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id === postId) {
-          updatedPost = {
-            ...p,
-            subscribers: [...(p.subscribers ?? []), newSub],
-          }
-          return updatedPost
-        }
-        return p
-      }),
-    )
-
-    try {
-      if (updatedPost) {
-        await setDoc(doc(db, 'posts', postId), updatedPost, { merge: true })
-      }
-    } catch (error) {
-      console.error('Erro ao adicionar inscrito no Firebase:', error)
+      console.error('Erro ao comentar publicação da Comunidade:', error)
     }
   }
 
@@ -1564,21 +2845,26 @@ function OrganizationDashboard({
       {section === 'community' && (
         <Community
           posts={posts}
+          animals={animals}
+          organizationPixKey={profile.pixKey}
           onSavePost={handleSaveCommunityPost}
           onDeletePost={handleDeleteCommunityPost}
           onLikePost={handleLikeCommunityPost}
           onAddComment={handleAddPostComment}
-          onAddSubscriber={handleAddCampaignSubscriber}
         />
       )}
       {section === 'animals' && (
         <Animals
           animals={animals}
           candidates={candidates}
+          adoptionConversations={adoptionConversations}
+          adoptionConversationsError={adoptionConversationsError}
           selectedAnimalId={selectedAnimalId}
           onSelectAnimal={setSelectedAnimalId}
           onAddAnimal={handleAddAnimal}
+          onSendAdoptionMessage={handleSendAdoptionMessage}
           onUpdateCandidateStatus={handleUpdateCandidateStatus}
+          onUpdateApplicationStatus={handleUpdateAdoptionApplicationStatus}
         />
       )}
       {section === 'checkins' && (
@@ -1593,19 +2879,29 @@ function OrganizationDashboard({
         <Profile
           profile={profile}
           onUpdateProfile={async (updated) => {
-            setProfile(updated)
-            pushNotification('Perfil Atualizado', 'Os dados institucionais foram salvos no sistema.', 'profile', 'info')
-            
             try {
-              await setDoc(doc(db, 'organizations', user.uid), {
+              profileWriteVersion.current += 1
+              const organizationReference = doc(db, 'organizations', user.uid)
+              const organizationSnapshot = await getDoc(organizationReference)
+              await setDoc(organizationReference, {
                 name: updated.name,
                 cnpj: updated.cnpj,
-                email: updated.email,
+                // A conta fake pode ainda não ter um documento organizations.
+                // Nesse caso a criação precisa usar o e-mail autenticado.
+                email: organizationSnapshot.exists()
+                  ? updated.email
+                  : user.email ?? updated.email,
+                institutionalEmail: updated.email,
                 pixKey: updated.pixKey,
-                responsibleName: updated.responsibleName
+                responsibleName: updated.responsibleName,
+                updatedAt: serverTimestamp(),
               }, { merge: true })
+              profileWriteVersion.current += 1
+              setProfile(updated)
+              pushNotification('Perfil atualizado', 'Os dados institucionais foram salvos no sistema.', 'profile', 'info')
             } catch (error) {
               console.error('Erro ao atualizar perfil no Firebase:', error)
+              throw error
             }
           }}
           onLogout={handleLogout}

@@ -6,13 +6,15 @@ import { auth } from '../../firebase'
 
 interface ProfileProps {
   profile: OrganizationProfile
-  onUpdateProfile: (updated: OrganizationProfile) => void
+  onUpdateProfile: (updated: OrganizationProfile) => void | Promise<void>
   onLogout: () => void
 }
 
 export function Profile({ profile, onUpdateProfile, onLogout }: ProfileProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<OrganizationProfile>(profile)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const [isDocModalOpen, setIsDocModalOpen] = useState(false)
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
@@ -24,12 +26,24 @@ export function Profile({ profile, onUpdateProfile, onLogout }: ProfileProps) {
   const [bylawsFile, setBylawsFile] = useState<File | null>(null)
   const [addressFile, setAddressFile] = useState<File | null>(null)
 
-  function handleSave() {
+  async function handleSave() {
     if (!formData.name.trim() || !formData.email.trim() || !formData.pixKey.trim()) {
+      setSaveError('Preencha a razão social, o e-mail institucional e a chave Pix.')
       return
     }
-    onUpdateProfile(formData)
-    setIsEditing(false)
+    setSaveError('')
+    setIsSaving(true)
+    try {
+      await onUpdateProfile(formData)
+      setIsEditing(false)
+    } catch (error) {
+      const code = (error as { code?: string }).code
+      setSaveError(code === 'permission-denied'
+        ? 'O Firebase recusou o salvamento. Publique as regras atualizadas e tente novamente.'
+        : 'Não foi possível salvar as alterações agora. Tente novamente.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   async function handlePasswordReset(e: React.FormEvent) {
@@ -79,12 +93,17 @@ export function Profile({ profile, onUpdateProfile, onLogout }: ProfileProps) {
             >
               Cancelar
             </button>
-            <button type="button" className="btn ap" onClick={handleSave}>
-              Salvar alterações
+            <button type="button" className="btn ap" onClick={() => void handleSave()} disabled={isSaving}>
+              {isSaving ? 'Salvando...' : 'Salvar alterações'}
             </button>
           </div>
         )}
       </div>
+      {saveError && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: '#fee2e2', color: '#991b1b', fontSize: 13 }}>
+          {saveError}
+        </div>
+      )}
 
       <div className="portal-grid profile-grid">
         <div className="portal-card">
@@ -177,7 +196,7 @@ export function Profile({ profile, onUpdateProfile, onLogout }: ProfileProps) {
               className="outline-button"
               onClick={() => setIsDocModalOpen(true)}
             >
-              Reenviar documento
+              Adicionar documentos
             </button>
             <button type="button" className="logout-link" onClick={onLogout}>
               Sair

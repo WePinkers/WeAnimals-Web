@@ -66,6 +66,26 @@ export type ChatMessage = {
   readByUser?: boolean
 }
 
+export type AdoptionConversationMessage = {
+  id: string
+  text: string
+  senderRole: 'user' | 'team'
+  senderName?: string
+  timestamp: string
+}
+
+export type AdoptionConversation = {
+  id: string
+  userId: string
+  animalId: string
+  userName: string
+  animalName: string
+  lastMessage: string
+  lastMessageTime: string
+  unread: number
+  messages: AdoptionConversationMessage[]
+}
+
 export type Report = {
   id: number
   protocolNumber?: number
@@ -118,14 +138,25 @@ export type AppNotification = {
 
 export type CandidateStatus = 'pendente' | 'aprovado' | 'recusado'
 
+export type AdoptionApplicationStatus =
+  | 'pending'
+  | 'reviewing'
+  | 'approved'
+  | 'rejected'
+  | 'visit_scheduled'
+  | 'adopted'
+  | 'cancelled'
+
 export type Candidate = {
   id: string
   animalId: string
+  userId?: string
   name: string
   pct: number
   location: string
   summary: string
   status: CandidateStatus
+  applicationStatus?: AdoptionApplicationStatus
   justification?: string
   answers: { question: string; answer: string }[]
 }
@@ -134,9 +165,14 @@ export type AnimalItem = {
   id: string
   name: string
   description: string
+  about?: string
+  species?: 'Cão' | 'Gato' | 'Outro'
+  breed?: string
+  ageText?: string
   size: 'Pequeno' | 'Médio' | 'Grande'
   arrivalDate: string
   traits: string[]
+  compatibility?: string[]
   requirements: string[]
   photos: string[]
 }
@@ -149,16 +185,78 @@ export type CampaignSubscriber = {
   status: string
 }
 
+export type CampaignCategory = 'Castração' | 'Vacinação' | 'Adoção' | 'Doação'
+
+export type CommunityPostCategory = 'Achados' | 'Dúvida' | 'Aviso' | 'Outro'
+
+export type CampaignLocation = {
+  name: string
+  address: string
+}
+
+export type CommunityCampaignAnimalInput = {
+  id?: string
+  name: string
+  breed: string
+  ageText: string
+  photoUrl?: string
+}
+
+export type CommunityCampaign = {
+  startsAt?: string
+  endsAt?: string
+  dateText?: string
+  location?: CampaignLocation
+  animalAudience?: string
+  capacity?: number | null
+  animalIds?: string[]
+  confirmedAnimals?: CommunityCampaignAnimalInput[]
+  donation?: {
+    deadline?: string
+    goalAmount?: number | null
+    currentAmount?: number
+    pixKey?: string
+    acceptsPix: boolean
+    acceptsItems: boolean
+    neededItems: string[]
+  }
+}
+
+export type CommunityPostInput = {
+  id?: string
+  title: string
+  type: 'Campanha' | 'Post'
+  categoryLabel: string
+  description: string
+  progressText?: string
+  progressPct?: number
+  campaign?: CommunityCampaign
+  postCategory?: CommunityPostCategory
+  imageUrl?: string
+  imageUrls?: string[]
+  location?: CampaignLocation
+  postDetails?: {
+    subject?: string
+    animalType?: string
+    occurredAt?: string
+    expiresAt?: string
+    contact?: string
+  }
+}
+
 export type PostComment = {
   id: string
   author: string
+  authorId?: string
   text: string
   timeAgo: string
+  parentCommentId?: string
 }
 
 export type CommunityPost = {
   id: string
   author: string
+  authorId?: string
   isOwn: boolean
   type: 'Campanha' | 'Post'
   categoryLabel: string
@@ -168,8 +266,22 @@ export type CommunityPost = {
   progressPct?: number
   subscribers?: CampaignSubscriber[]
   likes?: number
+  likedByCurrentUser?: boolean
   commentsList?: PostComment[]
   elapsed?: string
+  createdAtMillis?: number
+  campaign?: CommunityCampaign
+  postCategory?: CommunityPostCategory
+  imageUrl?: string
+  imageUrls?: string[]
+  location?: CampaignLocation
+  postDetails?: {
+    subject?: string
+    animalType?: string
+    occurredAt?: string
+    expiresAt?: string
+    contact?: string
+  }
 }
 
 export type CheckInPeriod = 30 | 90 | 180
@@ -177,14 +289,20 @@ export type CheckInPeriod = 30 | 90 | 180
 export type CheckInRecord = {
   id: string
   animal: string
+  photoUrl?: string
   adopter: string
   currentDays: CheckInPeriod
-  status: 'Ótima' | 'Alguns desafios' | 'Não respondido'
+  status: 'Ótima' | 'Boa' | 'Alguns desafios' | 'Difícil' | 'Não respondido'
   reviewed: boolean
   reportsByPeriod: Record<
     CheckInPeriod,
     { label: string; value: string }[]
   >
+  questionsByPeriod?: Record<
+    CheckInPeriod,
+    { id: string; label: string }[]
+  >
+  submittedByPeriod?: Record<CheckInPeriod, boolean>
 }
 
 export type OrganizationProfile = {

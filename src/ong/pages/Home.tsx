@@ -30,7 +30,6 @@ export function Home({
 
   const topCandidate = pendingCandidates[0] ?? candidates[0]
   const topAnimal = animals.find((a) => a.id === topCandidate?.animalId) ?? animals[0]
-  const latestCheckIn = checkIns[0]
 
   return (
     <section className="portal-page">
@@ -95,50 +94,77 @@ export function Home({
 
         <div className="portal-card">
           <h2>Candidaturas de adoção</h2>
-          {topAnimal && topCandidate ? (
-            <button
-              type="button"
-              className="compact-row"
-              onClick={() => onOpenCandidates(topAnimal.id)}
-            >
-              <span className="attention-icon">🐾</span>
-              <span>
-                <strong>
-                  {topAnimal.name} ·{' '}
-                  {candidates.filter((c) => c.animalId === topAnimal.id).length} candidatos
-                </strong>
-                <small>Mais compatível: {topCandidate.name}</small>
-              </span>
-              <b>{topCandidate.pct}%</b>
-            </button>
+          {candidates.length > 0 ? (
+            <div className="home-candidate-list">
+              {candidates.map((candidate) => {
+                const animal = animals.find((item) => item.id === candidate.animalId)
+                const photo = animal?.photos?.[0]
+                return (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    className="compact-row home-candidate-row"
+                    onClick={() => onOpenCandidates(candidate.animalId)}
+                  >
+                    {photo ? (
+                      <img
+                        className="home-candidate-animal-photo"
+                        src={photo}
+                        alt={`Foto de ${animal?.name ?? 'animal'}`}
+                      />
+                    ) : (
+                      <span className="attention-icon">🐾</span>
+                    )}
+                    <span>
+                      <strong>{animal?.name ?? 'Animal'}</strong>
+                      <small>{candidate.name} · {candidate.pct}% compatível</small>
+                    </span>
+                    <b>{candidate.pct}%</b>
+                  </button>
+                )
+              })}
+            </div>
           ) : (
             <div className="box">Sem candidaturas registradas.</div>
           )}
 
           <h2 className="second-card-title">Check-ins pós-adoção</h2>
-          {latestCheckIn ? (
-            <button
-              type="button"
-              className="compact-row"
-              onClick={() => onOpenCheckIns(latestCheckIn.id)}
-            >
-              <span className="attention-icon">◷</span>
-              <span>
-                <strong>
-                  {latestCheckIn.animal} · {latestCheckIn.currentDays} dias
-                </strong>
-                <small>
-                  Adotante: {latestCheckIn.adopter} · adaptação {latestCheckIn.status.toLowerCase()}
-                </small>
-              </span>
-              <span
-                className={`priority-badge ${
-                  latestCheckIn.status === 'Ótima' ? 'ok' : 'in-progress'
-                }`}
-              >
-                {latestCheckIn.status}
-              </span>
-            </button>
+          {checkIns.length > 0 ? (
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {checkIns.map((checkIn) => (
+                <button
+                  key={checkIn.id}
+                  type="button"
+                  className="compact-row"
+                  onClick={() => onOpenCheckIns(checkIn.id)}
+                >
+                  {checkIn.photoUrl ? (
+                    <img
+                      src={checkIn.photoUrl}
+                      alt={`Foto de ${checkIn.animal}`}
+                      style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '10px', border: '1px solid var(--ln)', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <span className="attention-icon">🐾</span>
+                  )}
+                  <span>
+                    <strong>
+                      {checkIn.animal} · {checkIn.currentDays} dias
+                    </strong>
+                    <small>
+                      Adotante: {checkIn.adopter} · adaptação {checkIn.status.toLowerCase()}
+                    </small>
+                  </span>
+                  <span
+                    className={`priority-badge ${
+                      checkIn.status === 'Ótima' || checkIn.status === 'Boa' ? 'ok' : 'in-progress'
+                    }`}
+                  >
+                    {checkIn.status}
+                  </span>
+                </button>
+              ))}
+            </div>
           ) : (
             <div className="box">Sem check-ins no momento.</div>
           )}
