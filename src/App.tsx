@@ -1324,7 +1324,51 @@ function OrganizationAccreditation({ onBack }: { onBack: () => void }) {
 }
 
 function OrganizationLoginBlocked({ onResubmit, onBack }: { onResubmit: () => void; onBack: () => void }) {
-  return <div style={{ padding: 40 }}>Bloqueado. <button onClick={onResubmit}>Reenviar</button> <button onClick={onBack}>Voltar</button></div>
+  return (
+    <main className="login-page">
+      <section className="login-brand-panel" aria-label="Sobre o WeAnimals">
+        <div className="brand-lockup">
+          <img
+            className="brand-silhouette"
+            src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
+            alt=""
+          />
+          <span>WeAnimals</span>
+        </div>
+        <div className="brand-message">
+          <span className="eyebrow">PAINEL INSTITUCIONAL</span>
+          <h1>Cuidar também é organizar o atendimento.</h1>
+          <p>Acompanhe denúncias, atualize ocorrências e ajude cada animal a encontrar proteção.</p>
+        </div>
+        <div className="brand-footer">
+          <span className="status-dot" /> Plataforma de proteção animal
+        </div>
+      </section>
+
+      <section className="login-form-panel">
+        <div className="login-card">
+          <button type="button" className="back-login-button" onClick={onBack}>
+            &larr; Voltar para o login
+          </button>
+          <div className="login-heading">
+            <span className="eyebrow">ACESSO INSTITUCIONAL</span>
+            <h2>Seu cadastro ainda está em análise</h2>
+            <p>
+              A solicitação foi recebida e aguarda a aprovação da equipe responsável.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <button type="button" className="primary-button" onClick={onResubmit}>
+              Adicionar documentos
+            </button>
+            <button type="button" className="text-button" onClick={onBack}>
+              Voltar para o login
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
 }
 
 function LoginError({ code }: { code: LoginErrorCode }) {

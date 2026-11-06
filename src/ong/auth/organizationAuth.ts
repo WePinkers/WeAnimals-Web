@@ -24,6 +24,23 @@ const ORGANIZATION_ACCOUNTS_COLLECTION = 'organization_accounts'
 const TEMPORARY_CNPJ = '62075431000174'
 const TEMPORARY_EMAIL = 'alissanovais@gmail.com'
 
+function normalizedApprovalStatus(value: unknown) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function isApprovedStatus(value: unknown) {
+  return new Set([
+    'approved',
+    'aprovado',
+    'aprovada',
+    'credenciado',
+    'credenciada',
+    'active',
+    'ativo',
+    'ativa',
+  ]).has(normalizedApprovalStatus(value))
+}
+
 export type LoginErrorCode =
   | 'invalid-identifier'
   | 'not-found'
@@ -102,8 +119,8 @@ export async function signInOrganization(
     const orgDocRef = doc(db, 'organizations', user.uid)
     const orgSnap = await getDoc(orgDocRef)
     
+    const orgData = orgSnap.exists() ? orgSnap.data() : {}
     if (orgSnap.exists()) {
-      const orgData = orgSnap.data()
       if (orgData.disabled) {
         await signOut(auth)
         throw new OrganizationAuthError('disabled', 'Conta desativada.')
@@ -111,24 +128,30 @@ export async function signInOrganization(
     }
 
     if (!isAdmin && !isTemporaryAccess) {
-      const pendingSnapshot = await getDocs(
+      const verificationSnapshot = await getDocs(
         query(
           collection(db, ORGANIZATION_VERIFICATION_COLLECTION),
           where('requesterId', '==', user.uid),
-          where('status', '==', 'pending'),
           limit(1),
         ),
       )
       const accountSnapshot = await getDoc(
         doc(db, ORGANIZATION_ACCOUNTS_COLLECTION, user.uid),
       )
-      const accountStatus = accountSnapshot.get('status')
+      const verificationData = verificationSnapshot.docs[0]?.data() ?? {}
+      const accountData = accountSnapshot.exists() ? accountSnapshot.data() : {}
+      const isApproved = [
+        orgData.isVerified === true,
+        orgData.approved === true,
+        isApprovedStatus(orgData.status),
+        isApprovedStatus(orgData.verificationStatus),
+        isApprovedStatus(verificationData.status),
+        verificationData.approved === true,
+        isApprovedStatus(accountData.status),
+        accountData.approved === true,
+      ].some(Boolean)
 
-      if (
-        !pendingSnapshot.empty ||
-        !accountSnapshot.exists() ||
-        accountStatus !== 'approved'
-      ) {
+      if (!isApproved) {
         await signOut(auth)
         throw new OrganizationAuthError('pending')
       }
