@@ -315,16 +315,7 @@ function PasswordRecovery({ onBack }: { onBack: () => void }) {
     setIsSubmitting(true)
     try {
       auth.languageCode = 'pt-BR'
-      const continueUrl = new URL(
-        '/password-reset-complete',
-        window.location.origin,
-      )
-      continueUrl.searchParams.set('account', 'organization')
-
-      await sendPasswordResetEmail(auth, normalizedEmail, {
-        url: continueUrl.toString(),
-        handleCodeInApp: false,
-      })
+      await sendPasswordResetEmail(auth, normalizedEmail)
       setSent(true)
     } catch (failure) {
       const code = (failure as { code?: string }).code

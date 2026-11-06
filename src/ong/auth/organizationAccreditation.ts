@@ -1,4 +1,8 @@
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+} from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../../firebase'
 
@@ -28,6 +32,9 @@ export async function submitOrganizationAccreditation(data: {
       data.password
     )
     const user = userCredential.user
+
+    auth.languageCode = 'pt-BR'
+    await sendEmailVerification(user)
 
     // MANTÉM O FLUXO REAL: Novas contas entram como não verificadas
     await setDoc(doc(db, 'organizations', user.uid), {
