@@ -74,6 +74,50 @@ import type {
   OrganizationProfile,
 } from './ong/types'
 
+const initialReports: Report[] = [
+  {
+    id: 4468,
+    priority: 'Muito urgente',
+    priorityClass: 'very-urgent',
+    title: 'Cão idoso',
+    location: 'Vila Marlene',
+    address: 'Rua Voluntários, 88 — Vila Marlene',
+    coordinates: { lat: -23.6687, lng: -46.5322 },
+    status: 'Equipe a caminho',
+    reporter: 'Renata F.',
+    reporterSince: 'mar 2025',
+    reporterTotalReports: 6,
+    reporterReliability: 94,
+    elapsed: 'há 22 min',
+    triage: {
+      immediateRisk: 'Não',
+      activeAbuse: 'Sim',
+      trappedOrInjured: 'Sim',
+      streetNoRisk: 'Não',
+      photoName: 'foto-cao-vila-marlene.jpg',
+    },
+    chat: [
+      { id: 'm1', text: 'O cão ainda está lá, alguém já foi?', mine: false, timestamp: '14:10' },
+      { id: 'm2', text: 'Equipe a caminho, chegada em 22 min.', mine: true, timestamp: '14:12' },
+    ],
+  },
+]
+
+const initialAnimals: AnimalItem[] = [
+  {
+    id: 'ani-1',
+    name: 'Canela',
+    description: 'SRD · 2 anos',
+    about: 'Resgatada em janeiro, dócil com crianças e outros cães. Castrada, vacinada e vermifugada.',
+    size: 'Médio',
+    arrivalDate: '2026-04-10',
+    traits: ['Vacinada', 'Castrada', 'Dócil'],
+    compatibility: ['Bom com crianças', 'Bom com outros cães', 'Energia moderada'],
+    requirements: ['Maior de 18 anos', 'Visita prévia'],
+    photos: [],
+  },
+]
+
 function mapAdoptionAnimalDocument(id: string, data: Record<string, any>): AnimalItem {
   const species = data.especie === 'gato' ? 'Gato' : data.especie === 'outro' ? 'Outro' : 'Cão'
   const traits = Array.isArray(data.caracteristicas)
@@ -258,6 +302,23 @@ function mapAdoptionApplicationCandidate(
     answers,
   }
 }
+
+const initialCandidates: Candidate[] = [
+  {
+    id: 'cand-1',
+    animalId: 'ani-1',
+    name: 'Renata Ferreira',
+    pct: 74,
+    location: 'Vila Marlene',
+    summary: 'já teve animais · apto com varanda · home office',
+    status: 'pendente',
+    answers: [
+      { question: 'Rotina', answer: 'Home office integral' },
+      { question: 'Espaço', answer: 'Apartamento com varanda telada' },
+      { question: 'Já teve animais?', answer: 'Sim, cães adultos' },
+    ],
+  },
+]
 
 const communityPostLabels: Record<string, CommunityPostCategory> = {
   FOUND: 'Achados',
@@ -551,6 +612,24 @@ function mapAdoptionCheckInRecord(
     submittedByPeriod,
   }
 }
+
+const initialCheckIns: CheckInRecord[] = [
+  {
+    id: 'chk-1',
+    animal: 'Girassol',
+    adopter: 'Renata F.',
+    currentDays: 90,
+    status: 'Ótima',
+    reviewed: false,
+    reportsByPeriod: {
+      30: checkInReportsForPeriod(30, { answers: { routine_adjusted: 'yes', health_or_behavior_issue: 'no' } }),
+      90: checkInReportsForPeriod(90, { answers: { walks_and_feeding_established: 'yes', behavior_changed: 'no', regular_vet_visits: 'yes' } }),
+      180: checkInReportsForPeriod(180, { answers: { strong_bond: 'yes', shelter_support_needed: 'no', recommend_adoption: 'yes_certainly' } }),
+    },
+    questionsByPeriod: adoptionCheckInQuestions,
+    submittedByPeriod: { 30: true, 90: true, 180: true },
+  },
+]
 
 function getAppRoutePath(pathname: string) {
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
@@ -1325,33 +1404,45 @@ function OrganizationDashboard({
   const [reportMessages, setReportMessages] = useState<Record<string, ChatMessage[]>>({})
   const [reportsError, setReportsError] = useState<string | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<any>(
-    () => reports[0]?.id,
+    () => reports[0]?.id ?? initialReports[0]?.id ?? 4468,
   )
 
-  const [animals, setAnimals] = useState<AnimalItem[]>([])
-  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('')
+  const [animals, setAnimals] = useState<AnimalItem[]>(() => {
+    const saved = localStorage.getItem('weanimals_animals')
+    return saved ? JSON.parse(saved) : initialAnimals
+  })
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>(() => animals[0]?.id ?? 'ani-1')
   const [adoptionConversations, setAdoptionConversations] = useState<AdoptionConversation[]>([])
   const [adoptionConversationsError, setAdoptionConversationsError] = useState<string | null>(null)
 
-  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [candidates, setCandidates] = useState<Candidate[]>(() => {
+    const saved = localStorage.getItem('weanimals_candidates')
+    return saved ? JSON.parse(saved) : initialCandidates
+  })
 
   const [posts, setPosts] = useState<CommunityPost[]>(() => {
     return []
   })
 
-  const [checkIns, setCheckIns] = useState<CheckInRecord[]>([])
-  const [selectedCheckInId, setSelectedCheckInId] = useState<string>('')
+  const [checkIns, setCheckIns] = useState<CheckInRecord[]>(() => {
+    const saved = localStorage.getItem('weanimals_checkins')
+    return saved ? JSON.parse(saved) : initialCheckIns
+  })
+  const [selectedCheckInId, setSelectedCheckInId] = useState<string>(() => checkIns[0]?.id ?? 'chk-1')
 
   const [profile, setProfile] = useState<OrganizationProfile & { isVerified?: boolean }>(() => {
-    return {
-      name: user.displayName || user.email?.split('@')[0] || 'Organização',
-      cnpj: '',
-      email: user.email || '',
-      pixKey: '',
-      responsibleName: '',
-      verifiedAt: '',
-      isVerified: false,
-    }
+    const saved = localStorage.getItem('weanimals_profile')
+    return saved
+      ? JSON.parse(saved)
+      : {
+          name: user.displayName || 'Abrigo Esperança',
+          cnpj: '00.000.000/0001-00',
+          email: user.email || 'contato@abrigoesperanca.org',
+          pixKey: user.email || 'doacoes@abrigoesperanca.org',
+          responsibleName: 'Responsável (Pendente)',
+          verifiedAt: new Date().toLocaleDateString('pt-BR'),
+          isVerified: true,
+        }
   })
   const profileWriteVersion = useRef(0)
 
@@ -1384,18 +1475,9 @@ function OrganizationDashboard({
     )
     const unsubscribeReports = onSnapshot(authenticatedReportsQuery, (snapshot) => {
       setReportsError(null)
-      const visibleReportDocs = snapshot.docs.filter((reportDoc) => {
-        const data = reportDoc.data()
-        const assignedOrganizationId = data.assignedOrganizationId
-
-        return typeof assignedOrganizationId !== 'string'
-          || !assignedOrganizationId.trim()
-          || assignedOrganizationId === user.uid
-      })
-
-      if (visibleReportDocs.length > 0) {
+      if (!snapshot.empty) {
         const reporterCounts = new Map<string, number>()
-        visibleReportDocs.forEach((reportDoc) => {
+        snapshot.docs.forEach((reportDoc) => {
           const reportData = reportDoc.data()
           const reporterId = reportData.userId || reportData.reporterId
           if (typeof reporterId === 'string' && reporterId.trim()) {
@@ -1403,7 +1485,7 @@ function OrganizationDashboard({
           }
         })
 
-        const realReports = visibleReportDocs.map((docSnap, index) => {
+        const realReports = snapshot.docs.map((docSnap, index) => {
           const data = docSnap.data()
           const priority = reportPriorityFromClassification(data)
           const reporterId = data.userId || data.reporterId
@@ -1478,12 +1560,11 @@ function OrganizationDashboard({
       where('ong_id', '==', user.uid),
     )
     const unsubscribeAnimals = onSnapshot(authenticatedAnimalsQuery, (snapshot) => {
-      setAnimals(snapshot.docs.map((animalDoc) =>
-        mapAdoptionAnimalDocument(animalDoc.id, animalDoc.data()),
-      ))
-    }, (error) => {
-      console.error('Erro ao carregar animais da ONG:', error)
-      setAnimals([])
+      if (!snapshot.empty) {
+        setAnimals(snapshot.docs.map((animalDoc) =>
+          mapAdoptionAnimalDocument(animalDoc.id, animalDoc.data()),
+        ))
+      }
     })
 
     const isTemporaryTestOrganization = user.email?.toLowerCase() === 'alissanovais@gmail.com'
@@ -1993,26 +2074,20 @@ function OrganizationDashboard({
       const cnpj = organizationCnpj && !/^0{2}[.\d/\-]*$/.test(organizationCnpj)
         ? organizationCnpj
         : String(verificationData.cnpj || mappedCnpj || organizationCnpj)
-      const approved = organizationData.isVerified === true
-        || organizationData.approved === true
-        || ['approved', 'aprovado', 'aprovada', 'credenciado', 'credenciada', 'active', 'ativo', 'ativa']
-          .includes(String(organizationData.status ?? organizationData.verificationStatus ?? '').trim().toLowerCase())
-        || verificationData.approved === true
-        || ['approved', 'aprovado', 'aprovada', 'credenciado', 'credenciada', 'active', 'ativo', 'ativa']
-          .includes(String(verificationData.status ?? '').trim().toLowerCase())
 
-      setProfile(() => ({
-        name: organizationData.name ?? verificationData.legalName ?? user.displayName ?? user.email?.split('@')[0] ?? 'Organização',
-        cnpj: normalizeOrganizationCnpj(cnpj),
+      setProfile((prev) => ({
+        ...prev,
+        name: organizationData.name ?? verificationData.legalName ?? prev.name,
+        cnpj: normalizeOrganizationCnpj(cnpj || prev.cnpj),
         email: organizationData.institutionalEmail
           ?? organizationData.email
           ?? verificationData.institutionalEmail
           ?? user.email
-          ?? '',
-        pixKey: organizationData.pixKey ?? verificationData.pixKey ?? '',
-        responsibleName: organizationData.responsibleName ?? verificationData.responsibleName ?? '',
-        isVerified: approved,
-        verifiedAt: organizationData.verifiedAt ?? verificationData.verifiedAt ?? '',
+          ?? prev.email,
+        pixKey: organizationData.pixKey ?? verificationData.pixKey ?? prev.pixKey,
+        responsibleName: organizationData.responsibleName ?? verificationData.responsibleName ?? prev.responsibleName,
+        isVerified: organizationData.isVerified ?? prev.isVerified,
+        verifiedAt: organizationData.verifiedAt ?? prev.verifiedAt,
       }))
     }
 
@@ -2085,6 +2160,22 @@ function OrganizationDashboard({
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
   }, [reportIdsKey, user.uid])
+
+  useEffect(() => {
+    localStorage.setItem('weanimals_animals', JSON.stringify(animals))
+  }, [animals])
+
+  useEffect(() => {
+    localStorage.setItem('weanimals_candidates', JSON.stringify(candidates))
+  }, [candidates])
+
+  useEffect(() => {
+    localStorage.setItem('weanimals_checkins', JSON.stringify(checkIns))
+  }, [checkIns])
+
+  useEffect(() => {
+    localStorage.setItem('weanimals_profile', JSON.stringify(profile))
+  }, [profile])
 
   function handleLogout() {
     localStorage.removeItem('weanimals_profile')
