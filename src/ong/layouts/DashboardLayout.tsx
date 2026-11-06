@@ -109,7 +109,7 @@ export function DashboardLayout({
         {/* LOGOTIPO */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', marginBottom: '16px' }}>
           <img
-            src="/weanimals-entry-silhouette.png"
+            src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
             alt=""
             style={{ width: '38px', height: '38px', objectFit: 'contain', flexShrink: 0 }}
           />

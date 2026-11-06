@@ -55,7 +55,7 @@ export default function AdminLayout({
         <div className="wa-brand">
           <div className="wa-brand-mark" style={{ background: 'transparent', padding: 0 }}>
           <img 
-            src="/weanimals-entry-silhouette.png" 
+            src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
             alt="Logo WeAnimals" 
             style={{ width: '40px', height: '40px', objectFit: 'contain' }}
           />

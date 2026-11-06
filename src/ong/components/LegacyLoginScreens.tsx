@@ -158,7 +158,7 @@ export function LegacyOrganizationLogin({
         <div className="brand-lockup">
           <img
             className="brand-silhouette"
-            src="/weanimals-entry-silhouette.png"
+            src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
             alt=""
           />
           <span>WeAnimals</span>
@@ -182,7 +182,7 @@ export function LegacyOrganizationLogin({
           <div className="mobile-brand brand-lockup">
             <img
               className="brand-silhouette"
-              src="/weanimals-entry-silhouette.png"
+              src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
               alt=""
             />
             <span>WeAnimals</span>
@@ -287,8 +287,8 @@ function LoginLoadingOverlay() {
     <div className="login-loading-overlay" role="status" aria-live="polite">
       <div className="login-loading-content">
         <div className="login-loading-logo" aria-hidden="true">
-          <img src="/weanimals-entry-silhouette.png" alt="" />
-          <img className="login-loading-logo-active" src="/weanimals-entry-silhouette.png" alt="" />
+          <img src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`} alt="" />
+          <img className="login-loading-logo-active" src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`} alt="" />
         </div>
         <strong>Entrando&hellip;</strong>
       </div>
@@ -360,7 +360,7 @@ function PasswordRecovery({ onBack }: { onBack: () => void }) {
         <div className="brand-lockup">
           <img
             className="brand-silhouette"
-            src="/weanimals-entry-silhouette.png"
+            src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
             alt=""
           />
           <span>WeAnimals</span>
@@ -384,7 +384,7 @@ function PasswordRecovery({ onBack }: { onBack: () => void }) {
           <div className="mobile-brand brand-lockup">
             <img
               className="brand-silhouette"
-              src="/weanimals-entry-silhouette.png"
+              src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
               alt=""
             />
             <span>WeAnimals</span>
@@ -577,7 +577,7 @@ function OrganizationAccreditation({ onBack }: { onBack: () => void }) {
         <div className="brand-lockup">
           <img
             className="brand-silhouette"
-            src="/weanimals-entry-silhouette.png"
+            src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
             alt=""
           />
           <span>WeAnimals</span>
@@ -601,7 +601,7 @@ function OrganizationAccreditation({ onBack }: { onBack: () => void }) {
           <div className="mobile-brand brand-lockup">
             <img
               className="brand-silhouette"
-              src="/weanimals-entry-silhouette.png"
+              src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
               alt=""
             />
             <span>WeAnimals</span>

@@ -945,7 +945,7 @@ export function OrganizationLogin({
     <main className="login-page">
       <section className="login-brand-panel" aria-label="Sobre o WeAnimals">
         <div className="brand-lockup">
-          <img className="brand-silhouette" src="/weanimals-entry-silhouette.png" alt="" />
+          <img className="brand-silhouette" src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`} alt="" />
           <span>WeAnimals</span>
         </div>
         <div className="brand-message">
