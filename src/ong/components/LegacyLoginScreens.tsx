@@ -99,7 +99,7 @@ export function LegacyOrganizationLogin({
       )
 
       if (await hasAdminAccess(authenticatedUser)) {
-        window.location.assign('/admin')
+        window.location.assign(`${import.meta.env.BASE_URL}admin`)
         return
       }
 

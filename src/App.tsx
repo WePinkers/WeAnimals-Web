@@ -631,8 +631,16 @@ const initialCheckIns: CheckInRecord[] = [
   },
 ]
 
+function getAppRoutePath(pathname: string) {
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
+  if (basePath && pathname.startsWith(`${basePath}/`)) {
+    return pathname.slice(basePath.length)
+  }
+  return pathname
+}
+
 function App() {
-  if (window.location.pathname.startsWith('/admin')) {
+  if (getAppRoutePath(window.location.pathname).startsWith('/admin')) {
     return <AdminRoute />
   }
 
@@ -690,7 +698,7 @@ function AdminRoute() {
           <button
             type="button"
             className="primary-button"
-            onClick={() => window.location.assign('/')}
+            onClick={() => window.location.assign(import.meta.env.BASE_URL)}
           >
             Voltar para o login
           </button>
@@ -733,7 +741,7 @@ function OrganizationPortalApp() {
         if (!active) return
 
         if (isAdmin) {
-          window.location.replace('/admin')
+          window.location.replace(`${import.meta.env.BASE_URL}admin`)
           return
         }
 
@@ -907,7 +915,7 @@ export function OrganizationLogin({
       )
 
       if (await hasAdminAccess(authenticatedUser)) {
-        window.location.assign('/admin')
+        window.location.assign(`${import.meta.env.BASE_URL}admin`)
         return
       }
 

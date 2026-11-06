@@ -83,7 +83,7 @@ function App() {
         return (
           <PerfilPage
             onLogout={() => {
-              void signOut(auth).then(() => window.location.assign('/'))
+              void signOut(auth).then(() => window.location.assign(import.meta.env.BASE_URL))
             }}
           />
         )
