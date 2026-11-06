@@ -1772,6 +1772,29 @@ button {
   font-weight: 700;
 }
 
+.verification-pending-card .primary-button {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.verification-info p,
+.login-blocked-info p {
+  margin: 4px 0 0;
+  color: var(--i6);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.status-screen-actions {
+  display: grid;
+  gap: 4px;
+  margin-top: 18px;
+}
+
+.status-screen-actions .login-blocked-resubmit {
+  margin-top: 0;
+}
+
 .login-loading-overlay {
   position: fixed;
   inset: 0;

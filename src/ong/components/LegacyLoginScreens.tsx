@@ -762,19 +762,72 @@ function OrganizationAccreditation({ onBack }: { onBack: () => void }) {
   )
 }
 
+function OrganizationStatusBrandPanel() {
+  return (
+    <section className="login-brand-panel" aria-label="Sobre o WeAnimals">
+      <div className="brand-lockup">
+        <img
+          className="brand-silhouette"
+          src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
+          alt=""
+        />
+        <span>WeAnimals</span>
+      </div>
+      <div className="brand-message">
+        <span className="eyebrow">PAINEL INSTITUCIONAL</span>
+        <h1>Cuidar também é organizar o atendimento.</h1>
+        <p>
+          Acompanhe denúncias, atualize ocorrências e ajude cada animal a
+          encontrar proteção.
+        </p>
+      </div>
+      <div className="brand-footer">
+        <span className="status-dot" />
+        Plataforma de proteção animal
+      </div>
+    </section>
+  )
+}
+
 function OrganizationVerificationPending({ onBack }: { onBack: () => void }) {
   return (
     <main className="login-page accreditation-page">
-      <section className="login-form-panel accreditation-form-panel">
+      <OrganizationStatusBrandPanel />
+      <section className="login-form-panel">
         <div className="login-card verification-pending-card">
-          <div className="verification-pending-content" role="status">
+          <div className="mobile-brand brand-lockup">
+            <img
+              className="brand-silhouette"
+              src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
+              alt=""
+            />
+            <span>WeAnimals</span>
+          </div>
+          <button type="button" className="back-login-button" onClick={onBack}>
+            &larr; Voltar para o login
+          </button>
+          <div className="login-heading">
             <span className="eyebrow">HOMOLOGAÇÃO</span>
             <h2>Documentação em análise</h2>
-            <p>Recebemos os dados da sua instituição.</p>
-            <button type="button" className="verification-back-button" onClick={onBack}>
-              Voltar para o início
-            </button>
+            <p>
+              Recebemos os dados da sua instituição. Nossa equipe vai revisar
+              a documentação e avisar assim que houver uma atualização.
+            </p>
           </div>
+          <div className="verification-info" role="status">
+            <span className="verification-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <div>
+              <strong>Cadastro recebido</strong>
+              <p>O acesso será liberado depois da aprovação do credenciamento.</p>
+            </div>
+          </div>
+          <button type="button" className="primary-button" onClick={onBack}>
+            Voltar para o login
+          </button>
         </div>
       </section>
     </main>
@@ -790,16 +843,46 @@ function OrganizationLoginBlocked({
 }) {
   return (
     <main className="login-page accreditation-page">
-      <section className="login-form-panel accreditation-form-panel">
+      <OrganizationStatusBrandPanel />
+      <section className="login-form-panel">
         <div className="login-card login-blocked-card">
-          <div className="login-blocked-content" role="status">
+          <div className="mobile-brand brand-lockup">
+            <img
+              className="brand-silhouette"
+              src={`${import.meta.env.BASE_URL}weanimals-entry-silhouette.png`}
+              alt=""
+            />
+            <span>WeAnimals</span>
+          </div>
+          <button type="button" className="back-login-button" onClick={onBack}>
+            &larr; Voltar para o login
+          </button>
+          <div className="login-heading">
             <span className="eyebrow">ACESSO INSTITUCIONAL</span>
             <h2>Seu cadastro ainda está em análise</h2>
+            <p>
+              Seu cadastro foi recebido e aguarda a aprovação da equipe
+              WeAnimals. O painel será liberado depois da análise.
+            </p>
+          </div>
+          <div className="login-blocked-info" role="status">
+            <span className="login-blocked-lock" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="5" y="10" width="14" height="10" rx="2" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" strokeLinecap="round" />
+              </svg>
+            </span>
+            <div>
+              <strong>Acesso temporariamente bloqueado</strong>
+              <p>Você poderá entrar assim que o credenciamento for aprovado.</p>
+            </div>
+          </div>
+          <div className="status-screen-actions">
             <button type="button" className="login-blocked-resubmit" onClick={onResubmit}>
-              Reenviar documentos
+              Adicionar documentos
             </button>
-            <button type="button" className="login-blocked-back" onClick={onBack}>
-              Voltar para o início
+            <button type="button" className="text-button" onClick={onBack}>
+              Voltar para o login
             </button>
           </div>
         </div>
