@@ -66,8 +66,6 @@ felipe.menegazzi@weanimals.com.br
 Senha de demonstração: 12345678
 ```
 
-> Como este repositório pode ser público, estas credenciais ficam visíveis para qualquer pessoa. Elas devem permanecer limitadas a contas fictícias de teste, sem dados reais ou permissões de produção.
-
 ## Desenvolvimento local
 
 Instale as dependências:
